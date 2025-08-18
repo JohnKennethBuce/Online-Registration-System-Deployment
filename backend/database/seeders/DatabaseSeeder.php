@@ -13,11 +13,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+       $this->call([
+            RoleSeeder::class,          // must come first (SuperAdmin role)
+            PrintStatusesSeeder::class,  // print status options
+            SuperAdminSeeder::class,     // creates SuperAdmin user from .env
+            ServerModesSeeder::class,    // links server mode to SuperAdmin 
+            TestDataSeeder::class,       // dev/demo data
         ]);
+
+        // Only run test/demo data in local or developement environments
+        if (app()->environment(['local', 'development'])) {
+            $this->call(TestDataSeeder::class);
+        }
     }
 }

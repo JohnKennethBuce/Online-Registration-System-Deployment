@@ -12,17 +12,34 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
+            
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            // Link to roles table
+            $table->foreignId('role_id')-> constrained ('roles')->cascadeOnUpdate()->restrictionOnDelete();
+            
+            // User basic information
+            $table->string('name'); // Full name of the user
+            $table->string('email')->unique(); // Unique email address for the user
+            $table->timestamp('email_verified_at')->nullable(); // Timestamp when the email was verified
+            $table->string('password', 255)->nullable(); // Keep nullable if some users (attendees) don’t need login 
+            $table->string('phone', 20)->nullable();
+
+            // User account status
+            $table->enum('status', ['active', 'inactive'])->default('active')->index(); 
+
+            // Remember token for password reset
             $table->rememberToken();
+
+            // Track who created this user (self-referencing FK)
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+
             $table->timestamps();
+            
+            
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
+            $table->string('email', 150)->primary();
             $table->string('token');
             $table->timestamp('created_at')->nullable();
         });
@@ -45,5 +62,6 @@ return new class extends Migration
         Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+
     }
 };
