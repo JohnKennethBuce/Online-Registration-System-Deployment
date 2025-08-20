@@ -12,7 +12,11 @@ class Registration extends Model
     protected $fillable =[
         'first_name', 'last_name', 'email', 'phone', 'address', 
         'registration_type', 'ticket_number', 'qr_code_path', 
-        'server_mode','badge_printed_status_id', 'ticket_printed_status_id',
+        'server_mode',
+    ];
+
+    protected $guarded = [
+        'badge_printed_status_id', 'ticket_printed_status_id',
         'confirmed', 'confirmed_by', 'registered_by'
     ];
 
