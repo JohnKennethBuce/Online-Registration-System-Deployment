@@ -48,6 +48,7 @@ class Kernel extends HttpKernel
             // Limits requests per minute (60 by default)
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ],
     ];
 

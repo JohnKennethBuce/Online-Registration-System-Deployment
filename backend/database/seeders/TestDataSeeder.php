@@ -64,7 +64,7 @@ class TestDataSeeder extends Seeder
                 'phone' => $faker->phoneNumber,
                 'address' => $faker->address,
                 'registration_type' => $faker->randomElement(['onsite', 'online', 'pre-registered']),
-                'qr_code_path' => '/qrcodes'. uniqid().'.png', // Example QR code path
+                'qr_code_path' => '/qrcodes/' . uniqid() . '.png', // Example QR code path
                 'server_mode' => 'onsite', // Default server mode
                 'badge_printed_status_id' => DB::table('print_statuses')->where('type', 'badge')->where('name', 'printed')->value('id'),
                 'ticket_printed_status_id' => DB::table('print_statuses')->where('type', 'ticket')->where('name', 'printed')->value('id'),
