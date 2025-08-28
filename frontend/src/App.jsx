@@ -1,44 +1,126 @@
-import { useState, useEffect } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./ProtectedRoute";
 
-function App() {
-  const [count, setCount] = useState(0)
-  const [apiMessage, setApiMessage] = useState('Loading...')
+import AdminPage from "./pages/AdminPage";
+import SuperadminPage from "./pages/SuperadminPage";
+import Unauthorized from "./pages/Unauthorized";
+import DashboardPage from "./pages/DashboardPage";
+import { useState } from "react";
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/test")
-      .then(res => res.json())
-      .then(data => setApiMessage(data.message))
-      .catch(err => setApiMessage("Error: " + err.message))
-  }, [])
+// 🔹 NavBar Component
+function NavBar() {
+  const { user, logout } = useAuth();
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <p>API says: {apiMessage}</p>
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <nav style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>
+      <Link to="/">Home</Link> |{" "}
+      {!user && <Link to="/login">Login</Link>}
+
+      {user && (
+        <>
+          {" | "}
+          <Link to="/dashboard">Dashboard</Link>
+          {" | "}
+          <Link to="/admin">Admin</Link>
+          {" | "}
+          <Link to="/superadmin">Superadmin</Link>
+          {" | "}
+          <button onClick={logout}>Logout</button>
+        </>
+      )}
+    </nav>
+  );
 }
 
-export default App
+// 🔹 Login Page
+function LoginPage() {
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const success = await login(email, password);
+    if (success) window.location.href = "/dashboard";
+    else alert("Invalid credentials");
+  };
+
+  return (
+    <div>
+      <h2>Login</h2>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <br />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <br />
+        <button type="submit">Login</button>
+      </form>
+    </div>
+  );
+}
+
+// 🔹 Home Page
+function Home() {
+  return (
+    <div>
+      <h2>Home</h2>
+      <p>Welcome to the Online Registration System 🚀</p>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <NavBar />
+
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute roles={["admin", "superadmin"]}>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute roles={["admin", "superadmin"]}>
+                <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/superadmin"
+            element={
+              <ProtectedRoute roles={["superadmin"]}>
+                <SuperadminPage />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+}
+
+export default App;

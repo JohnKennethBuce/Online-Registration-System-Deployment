@@ -14,12 +14,15 @@ class RolesSeeder extends Seeder
      */
     public function run(): void
     {
+        // pull from config
+        $permissions = config('permissions');
+
         DB::table('roles')->upsert([
             [
                 'id' => 1,
                 'name' => 'superadmin',
                 'description' => 'Full System Control',
-                'permissions' => json_encode(['*']), // All permissions granted
+                'permissions' => json_encode(['*']), // All permissions granted (our Wildcard)
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],
@@ -27,7 +30,7 @@ class RolesSeeder extends Seeder
                 'id' => 2,
                 'name' => 'admin',
                 'description' => 'Event operations and Monitoring',
-                'permissions' => json_encode(['manage_registrations','view_logs','scan_qr']), // limited permissions for admin
+                'permissions' => json_encode(['admin']), // limited permissions for admin
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],
@@ -35,7 +38,7 @@ class RolesSeeder extends Seeder
                 'id' => 3,
                 'name' => 'user',
                 'description' => 'attendee / Registrant',
-                'permissions' => json_encode([]), // No permissions granted by default
+                'permissions' => json_encode(['user']), // No permissions granted by default 
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],

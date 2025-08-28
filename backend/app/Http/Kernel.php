@@ -45,10 +45,17 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            // Limits requests per minute (60 by default)
-            'throttle:api',
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            // 🔹 Force all API responses to JSON
+            \App\Http\Middleware\ForceJsonResponse::class,
+    
+            // 🔹 Sanctum stateful check
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+    
+            // 🔹 Route model binding
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+    
+            // 🔹 Optional: request throttling
+            //'throttle:api',
         ],
     ];
 
@@ -68,8 +75,5 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-
-        // ✅ Your custom middleware
-        'role' => \App\Http\Middleware\EnsureRole::class,
     ];
 }

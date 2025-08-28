@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -12,6 +11,14 @@ class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * Always eager load these relationships.
+     *
+     * This ensures Auth::user() and Sanctum tokens
+     * always include the role without lazy-loading issues.
+     */
+    protected $with = ['role'];
 
     /**
      * The attributes that are mass assignable.
@@ -54,8 +61,7 @@ class User extends Authenticatable
         ];
     }
 
-    //relationships
-
+    // 🔹 Relationships
     public function role()
     {
         return $this->belongsTo(Role::class);
