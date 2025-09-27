@@ -25,6 +25,10 @@ return new class extends Migration
             $table->text('description')->nullable()
                   ->comment('Optional description of the status meaning');
 
+            // Active flag
+            $table->tinyInteger('active')->default(1)
+                 ->comment('1 = Active, 0 = Disabled');
+
             // Timestamps
             $table->timestamps();
 
@@ -33,9 +37,7 @@ return new class extends Migration
             $table->index('type'); // Quick lookups by type
         });
     }
-    /**
-     * Reverse the migrations.
-     */
+
     public function down(): void
     {
         Schema::dropIfExists('print_statuses');

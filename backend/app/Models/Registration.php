@@ -4,21 +4,77 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Crypt;
 
 class Registration extends Model
 {
     use HasFactory;
 
-    protected $fillable =[
-        'first_name', 'last_name', 'email', 'phone', 'address', 
-        'registration_type', 'ticket_number', 'qr_code_path', 
-        'server_mode',
+    protected $fillable = [
+        'first_name', 'last_name', 'email', 'phone', 'address',
+        'registration_type', 'server_mode', 'qr_code_path', 'ticket_number', 'confirmed_at',
     ];
 
     protected $guarded = [
         'badge_printed_status_id', 'ticket_printed_status_id',
-        'confirmed', 'confirmed_by', 'registered_by'
+        'confirmed', 'confirmed_by', 'registered_by',
     ];
+
+    protected $casts = [
+        'confirmed' => 'boolean',
+        'confirmed_at' => 'datetime',
+    ];
+
+    // Encryption for PII fields
+    public function setFirstNameAttribute($value)
+    {
+        $this->attributes['first_name'] = Crypt::encryptString($value);
+    }
+
+    public function getFirstNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setLastNameAttribute($value)
+    {
+        $this->attributes['last_name'] = Crypt::encryptString($value);
+    }
+
+    public function getLastNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = Crypt::encryptString($value);
+    }
+
+    public function getEmailAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getPhoneAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setAddressAttribute($value)
+    {
+        $this->attributes['address'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getAddressAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
     // Relationships
     public function confirmedBy()

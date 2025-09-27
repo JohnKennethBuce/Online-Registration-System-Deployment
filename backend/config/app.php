@@ -153,7 +153,6 @@ return [
     /*
      * Application Service Providers...
      */
-    App\Providers\AppServiceProvider::class,
     App\Providers\AuthServiceProvider::class, // ✅ must be here
     // App\Providers\EventServiceProvider::class,
     App\Providers\RouteServiceProvider::class,

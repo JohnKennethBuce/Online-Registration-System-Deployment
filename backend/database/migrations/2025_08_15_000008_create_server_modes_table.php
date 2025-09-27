@@ -17,9 +17,12 @@ return new class extends Migration
             // Mode set by Super Admin
             $table->enum('mode', ['onsite', 'online', 'both'])->index();
 
-            // who activated this mode 
-            $table->foreignId('activated_by')->constrained('users')->cascadeOnUpdate()->restrictOnDelete();
-
+            // who activated this mode
+            $table->foreignId('activated_by')
+                  ->nullable()
+                  ->constrained('users')
+                  ->cascadeOnUpdate()
+                  ->nullOnDelete();
             $table->timestamps();
 
             // Indexes for Reporting

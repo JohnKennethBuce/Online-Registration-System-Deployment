@@ -1,0 +1,794 @@
+Taka look of my work flow ensure that I already Completed database we need to Create This Web 
+
+My WorkFlow 
+
+React + Laravel One Hosting Setup
+How it works:
+1.	Build React app locally:
+2.	npm run build
+3.	Copy the /dist (Vite) or /build (CRA) folder contents into laravel/public/ (or laravel/resources/react for cleaner structure).
+4.	Laravel serves:
+o	/api/... → backend logic (Laravel API)
+o	/ and frontend routes → React’s index.html
+5.	Bluehost hosts everything as a single app at your domain.
+________________________________________
+🏗 Stack Plan
+Layer	Tech
+Frontend	React (Vite) + Tailwind UI
+Backend API	Laravel
+Database	MySQL (Bluehost)
+QR Gen	Laravel simple-qrcode (server-side)
+QR Scan	React react-qr-reader (browser)
+Printing	Laravel PDF (barryvdh/laravel-dompdf) OR React-to-print
+Emailing	Laravel Mail API (sends registration info + QR code)
+________________________________________
+⚙ Workflow
+Part 1 – Server Activation & Modes
+•	Superadmin selects server mode from dashboard:
+o	Onsite → Only Onsite page active.
+o	Online → Online registration + scanning page active.
+o	Both → Both Onsite and Online pages active.
+•	Registration type auto-assigned:
+o	If Server Mode = Onsite → Registrations tagged as Onsite.
+o	If Server Mode = Online → Registrations tagged as Online.
+•	Separate pages:
+o	/onsite → Kiosk registration interface.
+o	/online → Online registration interface.
+o	/scan → QR scanning & badge printing page (used in Online mode).
+________________________________________
+Part 2 – Registration Flows
+Unit 1 – POS Kiosk (Onsite)
+•	Public-facing kiosk — no staff needed during form filling.
+•	Flow:
+1.	User fills out registration form at kiosk.
+2.	System displays info for confirmation or edit.
+3.	After confirmation/edit:
+	Saves to DB in real time.
+	Badge/Ticket is generated (with QR) and automatically printed.
+________________________________________
+Unit 2 – Online Registration Station (Second POS)
+•	Public-facing web form — no staff needed during registration.
+•	Flow:
+1.	User registers online.
+2.	Info displayed for confirmation or edit.
+3.	After confirmation/edit:
+	Saves to DB in real time.
+	QR code is generated and displayed (user can save or print).
+4.	At event:
+	Staff scans QR code at /scan page.
+	System fetches record and automatically prints badge/ticket.
+________________________________________
+Part 3 – Admin/Superadmin Manual Registration
+•	Dropdown in registration form: Onsite, Online, Pre-Registered.
+•	After confirmation/edit:
+o	Saves to DB.
+o	Generates QR code.
+o	Sends email with registration details + QR code so attendee can present at Online station for badge printing.
+________________________________________
+Part 4 – Management System (Detailed)
+Roles & Permissions
+1. Super Admin (Full System Control)
+•	Server Activation Control
+o	Set Server Mode to:
+	Onsite only → Activates /onsite page.
+	Online only → Activates /online + /scan pages.
+	Both → Activates all three pages.
+o	Can switch modes instantly without downtime.
+•	Admin Management
+o	Create, edit, or delete Admin accounts.
+o	Assign/revoke permissions from Admins.
+o	Reset Admin passwords.
+•	Registration Configuration
+o	Enable/disable certain registration fields.
+o	Manage default values.
+o	Set badge/ticket printing templates.
+o	Configure QR code size, style, and embedded info.
+•	Registration Actions
+o	Create registrations manually with type dropdown: Onsite, Online, Pre-Registered.
+o	Edit or delete any registration.
+o	Trigger re-email of QR code and details.
+•	Email & Notification Settings
+o	Configure SMTP or email API keys.
+o	Customize email templates (for registration confirmation, QR delivery, reminders).
+•	System Monitoring
+o	View full user list (/api/users).
+o	View all activity logs (/api/logs).
+o	View system stats (/api/stats) — total registrations by type, per mode, per date range.
+o	View error logs (/api/error_logs).
+________________________________________
+2. Admin (Event Operations & Monitoring)
+•	Registration Management
+o	Create registrations manually with type dropdown: Onsite, Online, Pre-Registered.
+o	Edit any registration record.
+o	Trigger re-email of QR code and details.
+•	Monitoring
+o	View user list (registrations only, no access to Admin or Super Admin accounts).
+o	View activity logs (registrations only).
+o	View stats limited to registration counts, not system configuration.
+•	Operational Tools
+o	Access /scan page for scanning QR codes.
+o	Trigger badge/ticket printing for scanned QR codes.
+•	Restrictions
+o	Cannot change server mode.
+o	Cannot manage Admin or Super Admin accounts.
+o	Cannot alter email server configuration.
+________________________________________
+3. User (Attendee / Registrant)
+•	Self-Registration
+o	Can register via /onsite (kiosk) or /online (web form).
+o	Can confirm and edit their own details immediately after filling the form.
+•	QR Code Access
+o	Online registrants receive QR code on-screen and via email.
+o	Onsite registrants receive badge/ticket directly after confirmation.
+•	Scan & Print (Event Day)
+o	Online registrants present QR code for scanning at /scan station.
+o	Badge/ticket is printed after verification.
+•	Restrictions
+o	No access to /dashboard.
+o	No editing of registration after final confirmation (unless assisted by Admin/Super Admin).
+________________________________________
+/dashboard Sections
+1. User List (/api/users)
+•	Super Admin View: All users, all roles.
+•	Admin View: Registrations only.
+•	Columns: Name, Email, Phone, Type (Onsite, Online, Pre-Registered), Registration Date, Actions (Edit, Delete, Resend Email).
+2. Activity Logs (/api/logs)
+•	Records: Who registered, how (mode), timestamp, edits made, badge printing events, QR scans.
+•	Filter: Date range, registration type, action type.
+3. Stats (/api/stats)
+•	Super Admin: All stats, per mode, per date range, trends over time.
+•	Admin: Stats for registrations only.
+•	Metrics:
+o	Total Registrations (by type & date)
+o	Scans completed
+o	Badges printed
+o	Email delivery success rate
+________________________________________
+📦 Bluehost Deployment Strategy
+1.	Upload Laravel project to root hosting directory.
+2.	Place React build output into Laravel’s /public folder.
+3.	Update routes/web.php:
+4.	Route::get('/{any}', function () {
+5.	    return view('index'); // React index.html
+6.	})->where('any', '.*');
+7.	Keep API routes under /api/....
+________________________________________
+📂 Database Name: ors_maindb
+________________________________________
+1. Table: roles
+Stores role definitions (Super Admin, Admin, User).
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique role ID.
+name	VARCHAR(50)	UNIQUE, NOT NULL	Role name (e.g., superadmin, admin, user).
+permissions	JSON	NULL	Storing permissions in JSON format.
+description	TEXT	NULL	Role description.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+2. Table: users
+Stores all system users (Super Admin, Admin, and attendee accounts if needed).
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique user ID.
+role_id	BIGINT(20)	FK → roles.id, NOT NULL	User role.
+name	VARCHAR(100)	NOT NULL	Full name.
+email	VARCHAR(150)	UNIQUE, NOT NULL	Email address.
+email_verified_at	TIMESTAMP	NULL	Email verification date/time.
+password	VARCHAR(255)	NULL	Password (hashed).
+phone	VARCHAR(20)	NULL	Contact number.
+status	ENUM('active','inactive')	DEFAULT 'active'	Account status.
+remember_token	VARCHAR(100)	NULL	Token for "remember me" sessions.
+created_by	BIGINT(20)	FK → users.id, NULL	Who created this user.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+3. Table: registrations
+Stores attendee registration info and QR link.
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique registration ID.
+registered_by	BIGINT(20)	FK → users.id, NULL	User/Admin who created it (NULL if self-registration).
+first_name	VARCHAR(100)	NOT NULL	First name.
+last_name	VARCHAR(100)	NOT NULL	Last name.
+email	VARCHAR(150)	UNIQUE, NOT NULL	Attendee email.
+phone	VARCHAR(20)	NULL	Phone number.
+address	VARCHAR(255)	NULL	Address.
+registration_type	ENUM('onsite','online','pre_registered')	NOT NULL	Mode of registration.
+qr_code_path	VARCHAR(255)	NULL	Path/URL to QR code image.
+server_mode	ENUM('onsite','online','both')	DEFAULT 'onsite'	Server mode at time of registration.
+badge_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Badge print status.
+ticket_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Ticket print status.
+confirmed	TINYINT(1)	DEFAULT 0	0 = Pending, 1 = Confirmed.
+confirmed_by	BIGINT(20)	FK → users.id, NULL	Admin who confirmed registration.
+confirmed_at	TIMESTAMP	NULL	Date/time when confirmation happened.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+4. Table: logs
+Stores activity logs for tracking actions.
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique log ID.
+user_id	BIGINT(20)	FK → users.id, NULL	User/Admin who performed the action.
+action	VARCHAR(255)	NOT NULL	Action description.
+target_type	VARCHAR(50)	NULL	Target entity type (e.g., user, registration).
+target_id	BIGINT(20)	NULL	Related entity ID.
+ip_address	VARCHAR(45)	NULL	IP address of action.
+description	TEXT	NULL	Detailed description of the action.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time of action.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+5. Table: error_logs
+Stores system errors for debugging.
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique error log ID.
+user_id	BIGINT(20)	FK → users.id, NULL	User who experienced the error (if any).
+error_code	VARCHAR(50)	NULL	Optional error code.
+error_message	TEXT	NOT NULL	Error message details.
+stack_trace	LONGTEXT	NULL	Stack trace for debugging.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time of error.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+6. Table: server_modes
+Stores server activation modes set by Super Admin.
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique ID.
+mode	ENUM('onsite','online','both')	NOT NULL	Current mode.
+activated_by	BIGINT(20)	FK → users.id, NOT NULL	Super Admin who set the mode.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time set.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+7. Table: scans
+Stores QR scan events from /scan page.
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique scan ID.
+registration_id	BIGINT(20)	FK → registrations.id	Registration being scanned.
+scanned_by	BIGINT(20)	FK → users.id, NULL	Admin who scanned (NULL if auto).
+scan_time	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time scanned.
+badge_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Badge print status for this scan.
+ticket_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Ticket print status for this scan.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+8. Table: print_statuses
+Stores configurable print status options (managed by Super Admin).
+Column Name	Type	Attributes	Description
+id	BIGINT(20)	PK, AI	Unique print status ID.
+type	ENUM('badge','ticket')	NOT NULL	Status type (badge or ticket).
+name	VARCHAR(50)	UNIQUE, NOT NULL	Status name (e.g., not_printed, printed, reprinted).
+description	TEXT	NULL	Status description.
+active	TINYINT(1)	DEFAULT 1	1 = Active, 0 = Disabled.
+created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
+updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
+________________________________________
+🔑 Foreign Key Relationships
+•	users.role_id → roles.id
+•	users.created_by → users.id
+•	registrations.registered_by → users.id
+•	registrations.confirmed_by → users.id
+•	registrations.badge_printed_status_id → print_statuses.id
+•	registrations.ticket_printed_status_id → print_statuses.id
+•	logs.user_id → users.id
+•	error_logs.user_id → users.id
+•	server_modes.activated_by → users.id
+•	scans.registration_id → registrations.id
+•	scans.scanned_by → users.id
+•	scans.badge_printed_status_id → print_statuses.id
+•	scans.ticket_printed_status_id → print_statuses.id
+
+
+ 	🔄 Updated Process Flow
+Step	Description
+1	Superadmin selects server mode (Onsite, Online, Both).
+2	Visitor registers (either via kiosk or online form).
+3	System shows confirmation/edit screen.
+4	Onsite: After confirmation, badge/ticket printed immediately.
+5	Online: After confirmation, QR code shown + emailed to user.
+6	At event, staff scans QR → badge/ticket printed.
+7	Admin/Superadmin can manually register users and send QR via email.
+________________________________________ 
+
+What I've Created 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('roles', function (Blueprint $table) {
+            $table->id(); // Primary key
+
+            // Role Details
+            $table->string('name', 50)->unique(); // Role name: Super Admin, Admin, User
+            $table->json('permissions')->nullable(); // storing Permission in JSON Format
+            $table->text('description')->nullable(); // Description of the role
+            $table->timestamps(); // Create_at, Updated_at timestamps
+            
+            $table->index('created_at');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('roles');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            
+            $table->id();
+            // Link to roles table
+            $table->foreignId('role_id')-> constrained ('roles')->cascadeOnUpdate()->restrictionOnDelete();
+            
+            // User basic information
+            $table->string('name'); // Full name of the user
+            $table->string('email')->unique(); // Unique email address for the user
+            $table->timestamp('email_verified_at')->nullable(); // Timestamp when the email was verified
+            $table->string('password', 255)->nullable(); // Keep nullable if some users (attendees) don’t need login 
+            $table->string('phone', 20)->nullable();
+
+            // User account status
+            $table->enum('status', ['active', 'inactive'])->default('active')->index(); 
+
+            // Remember token for password reset
+            $table->rememberToken();
+
+            // Track who created this user (self-referencing FK)
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+
+            $table->timestamps();
+            
+            
+        });
+
+        Schema::create('password_reset_tokens', function (Blueprint $table) {
+            $table->string('email', 150)->primary();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('sessions', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->foreignId('user_id')->nullable()->index();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity')->index();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('sessions');
+
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('cache', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
+
+        Schema::create('cache_locks', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->string('owner');
+            $table->integer('expiration');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('cache');
+        Schema::dropIfExists('cache_locks');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts');
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
+        Schema::create('job_batches', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->string('name');
+            $table->integer('total_jobs');
+            $table->integer('pending_jobs');
+            $table->integer('failed_jobs');
+            $table->longText('failed_job_ids');
+            $table->mediumText('options')->nullable();
+            $table->integer('cancelled_at')->nullable();
+            $table->integer('created_at');
+            $table->integer('finished_at')->nullable();
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->unique();
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('job_batches');
+        Schema::dropIfExists('failed_jobs');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('print_statuses', function (Blueprint $table) {
+            $table->id(); // Primary Key
+
+            // Badge or Ticket status
+            $table->enum('type', ['badge', 'ticket'])
+                  ->comment('Defines whether this status applies to badges or tickets');
+
+            // Status name (unique within type)
+            $table->string('name', 50)
+                  ->comment('E.g., not_printed, printed, reprinted');
+
+            $table->text('description')->nullable()
+                  ->comment('Optional description of the status meaning');
+
+            // Timestamps
+            $table->timestamps();
+
+            // Constraints & Indexes
+            $table->unique(['type', 'name']); // Prevent duplicate status names for same type
+            $table->index('type'); // Quick lookups by type
+        });
+    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('print_statuses');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('registrations', function (Blueprint $table) {
+            
+            $table->id();
+
+            // Basic information about the registrant
+            $table->string('first_name', 100); // First name of the registrant
+            $table->string('last_name', 100); // Last name of the registrant
+            $table->string('email', 150)->unique(); //unique email of the registrant
+            $table->string('phone', 20)->nullable(); // Phone number of the registrant
+            $table->string('address', 255)->nullable(); // Address of the registrant
+
+            // Registration type auto-assigned based on server mode
+            $table->enum('registration_type', ['onsite', 'online', 'pre-registered'])->index();
+
+            //QR / Ticket identifiers
+            $table->string('ticket_number', 100)->unique()->nullable(); // Unique ticket number for printing badges/tickets
+            $table->string('qr_code_path', 255)->nullable(); // Path to the QR code image for this registration
+
+            // Server mode at time of registration (historical snapshot)
+            $table->enum('server_mode', ['onsite','online','both'])->default('onsite')->index();
+            
+            // Badge / Ticket printing status (configurable via print_statuses) 
+            $table->foreignId('badge_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
+            $table->foreignId('ticket_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
+
+            // confirmation tracking
+            $table->tinyInteger('confirmed')->default(0); // 0 = pending, 1 = confirmed
+            $table->foreignId('confirmed_by')->nullable()->constrained('users')->nullOnDelete(); // User who confirmed this registration
+            $table->timestamp('confirmed_at')->nullable();
+
+            // who registered this user 
+            $table->foreignId('registered_by')->nullable()->constrained('users')->nullOnDelete(); // User who registered this attendee
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('registrations');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('logs', function (Blueprint $table) {
+            $table->id(); // Primary key
+            
+            // actor of the action
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete(); // User who performed the action
+            
+            // action metadata
+            $table->string('action', 255); //short action name 
+            $table->string('target_type', 50)->nullable(); // Type of the target entity (e.g., 'registration', 'user', etc.)
+            $table->unsignedBigInteger('target_id')->nullable(); // Related entity ID
+
+            // IP address 
+            $table->string('ip_address', 45)->nullable(); // IP address of the user performing the action
+            $table->text('description')->nullable(); // Detailed description of the action
+            
+            $table->timestamps();
+
+            // Indexes for performance
+            $table->index('action');
+            $table->index('created_at');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('logs');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('error_logs', function (Blueprint $table) {
+            $table->id();
+
+            // user who experienced the error (nullable)
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+
+            // Error details
+            $table->string('error_code', 50)->nullable(); // Optional Error Code 
+            $table->text('error_message'); // Detailed error message
+            $table->longText('stack_trace')->nullable(); // Stack trace for debugging (optional)
+
+            $table->timestamps();
+
+            $table->index('created_at'); // Index for performance
+        }); 
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('error_logs');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('server_modes', function (Blueprint $table) {
+            $table->id();
+
+            // Mode set by Super Admin
+            $table->enum('mode', ['onsite', 'online', 'both'])->index();
+
+            // who activated this mode 
+            $table->foreignId('activated_by')->constrained('users')->cascadeOnUpdate()->restrictOnDelete();
+
+            $table->timestamps();
+
+            // Indexes for Reporting
+            $table->index('created_at');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('server_modes');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('scans', function (Blueprint $table) {
+            $table->id();
+           
+            // Registration being Scanned
+            $table->foreignId('registration_id')->constrained('registrations')->cascadeOnDelete();
+
+            // Who scaned (nullable, e.g. Auto scan)
+            $table->foreignId('scanned_by')->nullable()->constrained('users')->nullOnDelete();
+
+            // When it was scanned
+            $table->timestamp('scanned_time')->useCurrent();
+
+            // Badge / Ticket printing status (configurable via print_statuses)
+            $table->foreignId('badge_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
+            $table->foreignId('ticket_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
+
+            $table->timestamps();
+
+            // Indexes for performance
+            $table->index('scanned_time');
+            $table->index(['registration_id', 'badge_printed_status_id']);
+            $table->index(['registration_id', 'ticket_printed_status_id']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('scans');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->morphs('tokenable');
+            $table->text('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable()->index();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('personal_access_tokens');
+    }
+};
+
+
+09/24/25

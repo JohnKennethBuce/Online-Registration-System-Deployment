@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -19,21 +18,36 @@ class ServerModesSeeder extends Seeder
         $superAdmin = DB::table('users')->where('email', $superAdminEmail)->first();
 
         if (!$superAdmin) {
-            $this->command->warn("⚠️ SuperAdmin not found. Skipping ServerModesSeeder.");
+            $this->command->warn("⚠️ SuperAdmin not found. Using null for activated_by.");
             return;
         }
 
         // Avoid duplicate entries
-        $exists = DB::table('server_modes')->exists();
-        if ($exists) {
+        if (DB::table('server_modes')->exists()) {
+            $this->command->info("Server modes already seeded. Skipping.");
             return;
         }
 
-        DB::table('server_modes')->insert([
-            'mode' => env('DEFAULT_SERVER_MODE', 'onsite'), // configurable via .env
-            'activated_by' => $superAdmin->id,
-            'created_at' => Carbon::now(),
-            'updated_at' => Carbon::now(),
-        ]);
+        $modes = [
+            [   'mode' => 'onsite',
+                'activated_by' => $superAdmin ? $superAdmin->id : null,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ],
+            [
+                'mode' => 'online',
+                'activated_by' => $superAdmin ? $superAdmin->id : null,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ],
+            [
+                'mode' => 'both',
+                'activated_by' => $superAdmin ? $superAdmin->id : null,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ]
+        ];
+
+        DB::table('server_modes')->insert($modes);
     }
 }

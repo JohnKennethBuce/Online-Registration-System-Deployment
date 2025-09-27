@@ -10,7 +10,11 @@ class PrintStatus extends Model
     use HasFactory;
 
     protected $fillable =[
-        'type', 'name', 'description'
+        'type', 'name', 'description', 'active',
+    ];
+
+    protected $casts = [
+        'active' => 'boolean',
     ];
 
     // relationships    
@@ -25,12 +29,12 @@ class PrintStatus extends Model
         return $this->hasMany(Registration::class, 'ticket_printed_status_id');
     }
 
-    public function scansBadge()
+    public function scansAsBadge()
     {
         return $this->hasMany(Scan::class, 'badge_printed_status_id');
     }
 
-    public function scansTicket()
+    public function scansAsTicket()
     {
         return $this->hasMany(Scan::class, 'ticket_printed_status_id');
     }

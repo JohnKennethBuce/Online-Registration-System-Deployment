@@ -14,6 +14,12 @@ class Scan extends Model
         'ticket_printed_status_id'
     ];
 
+    protected $cast = [
+        'scanned_time' => 'datetime',
+        'created_at'  => 'datetime',
+        'updated_at'  => 'datetime',
+    ];
+
     //relationships
 
     public function registration()
