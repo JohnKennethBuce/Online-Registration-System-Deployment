@@ -2,10 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\User; // 👈 Import User model
+use App\Models\Registration; // 👈 Import Registration model
+use App\Models\Scan; // 👈 Import Scan model (assuming it exists)
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 use Faker\Factory as Faker;
 
@@ -18,83 +19,76 @@ class TestDataSeeder extends Seeder
     {
         $faker = Faker::create();
 
-        // ✅ Fetch role IDs
+        // ✅ Fetch role and status IDs once to be efficient
         $adminRoleId = DB::table('roles')->where('name', 'admin')->value('id');
         $userRoleId = DB::table('roles')->where('name', 'user')->value('id');
-        $superAdminId= DB::table('users')->where('email', env('SUPERADMIN_EMAIL', 'superadmin@dev.com'))->value('id');
+        $superAdmin = User::where('email', env('SUPERADMIN_EMAIL', 'superadmin@dev.com'))->first();
+        $badgePrintedStatusId = DB::table('print_statuses')->where('type', 'badge')->where('name', 'printed')->value('id');
+        $ticketPrintedStatusId = DB::table('print_statuses')->where('type', 'ticket')->where('name', 'printed')->value('id');
 
-        // ✅ Create Admins 
-        // ($i = 0; $i < 3; $i++) means "create 3 admin users"
-        for ($i = 0; $i < 3; $i++){
-            DB::table('users')->insert([
+        // ✅ Create Admins using the User model
+        for ($i = 0; $i < 3; $i++) {
+            User::create([
                 'role_id' => $adminRoleId,
                 'name' => $faker->name,
                 'email' => $faker->unique()->safeEmail,
                 'email_verified_at' => Carbon::now(),
-                'password' => Hash::make('password'), // default password for testing
+                'password' => 'password', // The User model will hash this automatically
                 'phone' => $faker->phoneNumber,
                 'status' => 'active',
-                'created_by' => $superAdminId, // created by SuperAdmin
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]); 
+                'created_by' => $superAdmin->id,
+            ]);
         }
-        // ✅ Create Users (attendees)
-        // ($i = 0; $i < 10; $i++) means "create 10 user attendees"
-        for ($i = 0; $i < 10; $i++){
-            $userId = DB::table('users')->insertGetId([
+
+        // ✅ Create Users (attendees) and their Registrations
+        for ($i = 0; $i < 10; $i++) {
+            $user = User::create([
                 'role_id' => $userRoleId,
                 'name' => $faker->name,
                 'email' => $faker->unique()->safeEmail,
-                'email_verified_at' => null, // not verified for testing
-                'password' => Hash::make('password'), // default password for testing
+                'password' => 'password',
                 'phone' => $faker->phoneNumber,
                 'status' => 'active',
-                'created_by' => $superAdminId, // created by SuperAdmin
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'created_by' => $superAdmin->id,
             ]);
 
-            // ✅ Registrations for each user
-            $registrationId = DB::table('registrations')->insertGetId([
-                'registered_by' => $superAdminId, // created by SuperAdmin
+            // ✅ Create Registrations using the Registration model
+            // THIS IS THE CRITICAL FIX: Using the model triggers the encryption
+            $registration = Registration::create([
                 'first_name' => $faker->firstName,
                 'last_name' => $faker->lastName,
                 'email' => $faker->unique()->safeEmail,
                 'phone' => $faker->phoneNumber,
                 'address' => $faker->address,
                 'registration_type' => $faker->randomElement(['onsite', 'online', 'pre-registered']),
-                'qr_code_path' => '/qrcodes/' . uniqid() . '.png', // Example QR code path
-                'server_mode' => 'onsite', // Default server mode
-                'badge_printed_status_id' => DB::table('print_statuses')->where('type', 'badge')->where('name', 'printed')->value('id'),
-                'ticket_printed_status_id' => DB::table('print_statuses')->where('type', 'ticket')->where('name', 'printed')->value('id'),
-                'confirmed' => 0, // Not confirmed by default
-                'confirmed_by' => null, // Not confirmed yet
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'qr_code_path' => '/qrcodes/' . uniqid() . '.png',
+                'server_mode' => 'onsite',
+                'ticket_number' => uniqid('TICKET-'),
+                'registered_by' => $superAdmin->id,
+                'badge_printed_status_id' => $badgePrintedStatusId,
+                'ticket_printed_status_id' => $ticketPrintedStatusId,
+                'confirmed' => false,
             ]);
 
             // ✅ Simulate scans
             if ($faker->boolean(50)) {
-                DB::table('scans')->insert([
-                    'registration_id' => $registrationId,
-                    'scanned_by' => $superAdminId, // scanned by SuperAdmin
+                // Assuming a Scan model exists and registration_id, scanned_by are fillable
+                Scan::create([
+                    'registration_id' => $registration->id,
+                    'scanned_by' => $superAdmin->id,
                     'scanned_time' => Carbon::now(),
-                    'badge_printed_status_id' => DB::table('print_statuses')->where('type', 'badge')->where('name', 'printed')->value('id'),
-                    'ticket_printed_status_id' => DB::table('print_statuses')->where('type', 'ticket')->where('name', 'printed')->value('id'),
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
+                    'badge_printed_status_id' => $badgePrintedStatusId,
+                    'ticket_printed_status_id' => $ticketPrintedStatusId,
                 ]);
             }
         }
 
-        // ✅ Logs
+        // It's better to log actions within a controller, but we'll leave this for now.
         DB::table('logs')->insert([
-            'user_id' => $superAdminId, // SuperAdmin created the logs
+            'user_id' => $superAdmin->id,
             'action' => 'system_seed',
-            'target_id' => null, // No specific target for this action
             'ip_address'=>'127.0.0.1',
-            'description' => 'Initial test data seeded. ',
+            'description' => 'Initial test data seeded.',
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);

@@ -7,23 +7,53 @@ use App\Models\PrintStatus;
 use App\Models\ServerMode;
 use App\Models\Scan;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator; // ✅ add this
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
+use Illuminate\Support\Facades\Log;
 
 class RegistrationController extends Controller
 {
+    public function index()
+    {
+        $registrations = Registration::all();
+        $registrations = Registration::with(['badgeStatus','ticketStatus'])->get();
+        return response()->json([
+            'message' => 'Registrations retrieved successfully',
+            'registrations' => $registrations,
+        ]);
+    }
+    
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        // ✅ now call the imported names directly (no backslash)
+        $validator = Validator::make($request->all(), [
             'first_name'        => 'required|string|max:255',
             'last_name'         => 'required|string|max:255',
-            'email'             => 'required|email|max:255|unique:registrations,email',
+            'email'             => 'required|email|max:255',
             'phone'             => 'nullable|string|max:20',
             'address'           => 'nullable|string|max:255',
             'registration_type' => 'required|in:onsite,online,pre-registered',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error'   => 'Validation failed',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        // manual uniqueness check
+        $duplicate = Registration::get()->contains(fn($r) => $r->email === $validated['email']);
+        if ($duplicate) {
+            return response()->json([
+                'error' => 'This email address is already registered.'
+            ], 422);
+        }
 
         $serverMode = ServerMode::latest()->first();
         if (!$serverMode) {
@@ -39,7 +69,7 @@ class RegistrationController extends Controller
             return response()->json(['error' => 'Print statuses not configured'], 400);
         }
 
-        $ticketNumber = (string)Str::uuid();
+        $ticketNumber = (string) Str::uuid(); // ✅ uses imported Str
 
         $data = [
             'first_name'              => $validated['first_name'],
@@ -53,39 +83,32 @@ class RegistrationController extends Controller
             'ticket_printed_status_id'=> $ticketNotPrinted->id,
             'ticket_number'           => $ticketNumber,
             'confirmed'               => 0,
-            'registered_by'           => Auth::id(),
+            'registered_by'           => Auth::id(), // ✅ uses imported Auth
         ];
 
-        // ✅ Generate a PNG QR code with chillerlan
-        if ($validated['registration_type'] === 'online') {
+        $qrCodePath    = 'qrcodes/'.$ticketNumber.'.png';
+        $qrCodeContent = $ticketNumber;
 
-            $qrCodePath = 'qrcodes/'.$ticketNumber.'.png';
-            $qrCodeContent = $ticketNumber;
+        $options = new QROptions([
+            'version'    => 5,
+            'outputType' => QRCode::OUTPUT_IMAGE_PNG,
+            'eccLevel'   => QRCode::ECC_H,
+            'scale'      => 6,
+            'imageBase64'=> false,
+        ]);
 
-            $options = new QROptions([
-                'version'      => 5,
-                'outputType'   => QRCode::OUTPUT_IMAGE_PNG, // force PNG using GD
-                'eccLevel'     => QRCode::ECC_H,           // high error correction
-                'scale'        => 6,                       // roughly 200px
-                'imageBase64'  => false,
-            ]);
-
-            $fullPath = storage_path('app/public/'.$qrCodePath);
-            // Make sure the directory exists
-            if (!is_dir(dirname($fullPath))) {
-                mkdir(dirname($fullPath), 0755, true);
-            }
-
-            // Write the file
-            (new QRCode($options))->render($qrCodeContent, $fullPath);
-
-            $data['qr_code_path'] = $qrCodePath;
+        $fullPath = storage_path('app/public/'.$qrCodePath);
+        if (!is_dir(dirname($fullPath))) {
+            mkdir(dirname($fullPath), 0755, true);
         }
+
+        (new QRCode($options))->render($qrCodeContent, $fullPath);
+        $data['qr_code_path'] = $qrCodePath;
 
         $registration = Registration::create($data);
 
         return response()->json([
-            'message' => 'Registration successful',
+            'message'      => 'Registration successful',
             'registration' => $registration,
         ], 201);
     }
@@ -180,18 +203,17 @@ class RegistrationController extends Controller
         $ticketPrinted = PrintStatus::where('type', 'ticket')->where('name', 'printed')->where('active', 1)->first();
         if (!$ticketPrinted)
         {
-            return response()->json(['error' => 'Badge printed status not configured'], 400);
+            return response()->json(['error' => 'ticket printed status not configured'], 400);
         }
 
         // update the registration
         $registration->update([
-            'badge_printed_status_id' => $ticketPrinted->id,
+            'ticket_printed_status_id' => $ticketPrinted->id,
         ]);
 
         return response()->json([
-            'message' => 'Badge marked as printed',
+            'message' => 'ticket marked as printed',
             'registration' => $registration->fresh(),
         ]);
-
     }
 }

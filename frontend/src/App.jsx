@@ -7,6 +7,9 @@ import SuperadminPage from "./pages/SuperadminPage";
 import Unauthorized from "./pages/Unauthorized";
 import DashboardPage from "./pages/DashboardPage";
 import { useState } from "react";
+import Registrations from "./pages/Registrations";
+import RegistrationForm from "./pages/RegistrationForm";
+
 
 // 🔹 NavBar Component
 function NavBar() {
@@ -25,6 +28,14 @@ function NavBar() {
           <Link to="/admin">Admin</Link>
           {" | "}
           <Link to="/superadmin">Superadmin</Link>
+          {["admin", "superadmin"].includes(user.role?.name) && (
+            <>
+              {" | "}
+              <Link to="/registrations">Registrations</Link>
+              {" | "}
+              <Link to="/register-new">New Registration</Link>
+            </>
+          )}
           {" | "}
           <button onClick={logout}>Logout</button>
         </>
@@ -117,6 +128,25 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/registrations"
+            element={
+              <ProtectedRoute roles={["admin", "superadmin"]}>
+                <Registrations />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/register-new"
+            element={
+              <ProtectedRoute roles={["admin", "superadmin"]}>
+                <RegistrationForm />
+              </ProtectedRoute>
+            }
+          />
+
         </Routes>
       </Router>
     </AuthProvider>

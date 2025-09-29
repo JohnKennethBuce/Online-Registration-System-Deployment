@@ -4,46 +4,40 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('registrations', function (Blueprint $table) {
             $table->id();
 
-            // Basic information about the registrant
-            $table->text('first_name');       // First name of the registrant
-            $table->text('last_name');        // Last name of the registrant
-            $table->text('email')->unique();  // Unique email of the registrant
-            $table->text('phone')->nullable();// Phone number of the registrant
-            $table->text('address')->nullable();// Address of the registrant
+            // Encrypted personal info
+            $table->text('first_name');
+            $table->text('last_name');
+            $table->text('email');
+            $table->text('phone')->nullable();
+            $table->text('address')->nullable();
 
-            // Registration type auto-assigned based on server mode
-            $table->enum('registration_type', ['onsite', 'online', 'pre-registered'])->index();
+            $table->enum('registration_type', ['onsite','online','pre-registered'])->index();
 
-            // QR / Ticket identifiers
-            $table->string('ticket_number', 100)->unique()->nullable(); // Unique ticket number
-            $table->string('qr_code_path', 255)->nullable();            // Path to the QR code image
+            // Ticket / QR
+            $table->string('ticket_number', 100)->unique()->nullable();
+            $table->string('qr_code_path', 255)->nullable();
 
-            // Server mode at time of registration (historical snapshot)
             $table->enum('server_mode', ['onsite','online','both'])->default('onsite')->index();
-            
-            // Badge / Ticket printing status (configurable via print_statuses)
+
+            // Print statuses
             $table->foreignId('badge_printed_status_id')->nullable()
                   ->constrained('print_statuses')->nullOnDelete();
             $table->foreignId('ticket_printed_status_id')->nullable()
                   ->constrained('print_statuses')->nullOnDelete();
 
-            // Confirmation tracking
-            $table->tinyInteger('confirmed')->default(0); // 0 = pending, 1 = confirmed
+            // Confirmation
+            $table->boolean('confirmed')->default(false);
             $table->foreignId('confirmed_by')->nullable()
                   ->constrained('users')->nullOnDelete();
             $table->timestamp('confirmed_at')->nullable();
 
-            // Who registered this user
+            // Who registered
             $table->foreignId('registered_by')->nullable()
                   ->constrained('users')->nullOnDelete();
 
@@ -51,9 +45,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('registrations');

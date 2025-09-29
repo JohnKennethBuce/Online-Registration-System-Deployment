@@ -12,7 +12,8 @@ class Registration extends Model
 
     protected $fillable = [
         'first_name', 'last_name', 'email', 'phone', 'address',
-        'registration_type', 'server_mode', 'qr_code_path', 'ticket_number', 'confirmed_at',
+        'registration_type', 'server_mode', 'qr_code_path',
+        'ticket_number', 'confirmed_at',
     ];
 
     protected $guarded = [
@@ -21,16 +22,17 @@ class Registration extends Model
     ];
 
     protected $casts = [
-        'confirmed' => 'boolean',
+        'confirmed'    => 'boolean',
         'confirmed_at' => 'datetime',
     ];
 
-    // Encryption for PII fields
+    /* ---------------------------
+     |  Encrypt / Decrypt Fields
+     |----------------------------*/
     public function setFirstNameAttribute($value)
     {
         $this->attributes['first_name'] = Crypt::encryptString($value);
     }
-
     public function getFirstNameAttribute($value)
     {
         return $value ? Crypt::decryptString($value) : null;
@@ -40,7 +42,6 @@ class Registration extends Model
     {
         $this->attributes['last_name'] = Crypt::encryptString($value);
     }
-
     public function getLastNameAttribute($value)
     {
         return $value ? Crypt::decryptString($value) : null;
@@ -50,7 +51,6 @@ class Registration extends Model
     {
         $this->attributes['email'] = Crypt::encryptString($value);
     }
-
     public function getEmailAttribute($value)
     {
         return $value ? Crypt::decryptString($value) : null;
@@ -60,7 +60,6 @@ class Registration extends Model
     {
         $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
     }
-
     public function getPhoneAttribute($value)
     {
         return $value ? Crypt::decryptString($value) : null;
@@ -70,13 +69,14 @@ class Registration extends Model
     {
         $this->attributes['address'] = $value ? Crypt::encryptString($value) : null;
     }
-
     public function getAddressAttribute($value)
     {
         return $value ? Crypt::decryptString($value) : null;
     }
 
-    // Relationships
+    /* ---------------------------
+     |  Relationships
+     |----------------------------*/
     public function confirmedBy()
     {
         return $this->belongsTo(User::class, 'confirmed_by');

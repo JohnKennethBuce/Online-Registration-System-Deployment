@@ -48,8 +48,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // ✅ Registration route
+    Route::get('/registrations', [RegistrationController::class, 'index']);
     Route::post('/registrations', [RegistrationController::class, 'store'])
      ->name('registrations.store');
     Route::get('/registrations/{ticket_number}', [RegistrationController::class, 'show'])->name('registrations.show');
     Route::post('/registrations/scan', [RegistrationController::class, 'scan']);
+    Route::post('/registrations/{ticket_number}/print_badge', [RegistrationController::class, 'printBadge']);
+    Route::post('/registrations/{ticket_number}/print_ticket', [RegistrationController::class, 'printTicket']);
+    
 });
