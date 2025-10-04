@@ -10,11 +10,14 @@ class Role extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'description',
+        'name', 'permissions', 'description',
+    ];
+
+    protected $casts = [
+        'permissions' => 'array',  // JSON to array
     ];
 
     // Relationship
-
     public function users()
     {
         return $this->hasMany(User::class);

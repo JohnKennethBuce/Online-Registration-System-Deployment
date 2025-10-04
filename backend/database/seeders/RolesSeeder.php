@@ -2,47 +2,42 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Role;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class RolesSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // pull from config
-        $permissions = config('permissions');
-
-        DB::table('roles')->upsert([
+        Role::updateOrCreate(
+            ['name' => 'superadmin'],
             [
-                'id' => 1,
-                'name' => 'superadmin',
                 'description' => 'Full System Control',
-                'permissions' => json_encode(['*']), // All permissions granted (our Wildcard)
+                'permissions' => json_encode(['*']), // Explicitly JSON-encoded
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
-            ],
+            ]
+        );
+
+        Role::updateOrCreate(
+            ['name' => 'admin'],
             [
-                'id' => 2,
-                'name' => 'admin',
                 'description' => 'Event operations and Monitoring',
-                'permissions' => json_encode(['admin']), // limited permissions for admin
+                'permissions' => json_encode(['admin']), // Explicitly JSON-encoded
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
-            ],
+            ]
+        );
+
+        Role::updateOrCreate(
+            ['name' => 'user'],
             [
-                'id' => 3,
-                'name' => 'user',
                 'description' => 'attendee / Registrant',
-                'permissions' => json_encode(['user']), // No permissions granted by default 
+                'permissions' => json_encode(['user']), // Explicitly JSON-encoded
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
-            ],
-        ], ['id'], ['name','description','permissions','updated_at']);   
-       
+            ]
+        );
     }
 }

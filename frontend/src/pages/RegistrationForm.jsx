@@ -33,7 +33,8 @@ export default function RegistrationForm() {
         email: "",
         phone: "",
         address: "",
-        registration_type: "onsite",
+        company_name: "",
+        registration_type: "onsite", //default
       });
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
@@ -81,6 +82,13 @@ export default function RegistrationForm() {
           name="address"
           placeholder="Address (optional)"
           value={form.address}
+          onChange={handleChange}
+        /><br/>
+
+        <input
+          name="company_name"
+          placeholder="Company Name (optional)"
+          value={form.company_name}
           onChange={handleChange}
         /><br/>
 

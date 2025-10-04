@@ -27,7 +27,7 @@ return new class extends Migration
 
             // Active flag
             $table->tinyInteger('active')->default(1)
-                 ->comment('1 = Active, 0 = Disabled');
+                 ->comment('1 = Active, 0 = Disabled');  // Added comment
 
             // Timestamps
             $table->timestamps();

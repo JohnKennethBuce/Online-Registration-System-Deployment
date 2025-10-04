@@ -15,4 +15,10 @@ class ServerMode extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    // relationship
+    public function activatedBy()
+    {
+        return $this->belongsTo(User::class, 'activated_by');
+    }
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Crypt;
 
 class User extends Authenticatable
 {
@@ -61,6 +62,16 @@ class User extends Authenticatable
         ];
     }
 
+    // Added phone encryption
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getPhoneAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
     // 🔹 Relationships
     public function role()
     {

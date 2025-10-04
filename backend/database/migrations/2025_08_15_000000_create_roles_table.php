@@ -15,9 +15,9 @@ return new class extends Migration
             $table->id(); // Primary key
 
             // Role Details
-            $table->string('name', 50)->unique(); // Role name: Super Admin, Admin, User
-            $table->json('permissions')->nullable(); // storing Permission in JSON Format
-            $table->text('description')->nullable(); // Description of the role
+            $table->string('name', 50)->unique()->comment('Role name: Super Admin, Admin, User'); // Added unique constraint
+            $table->json('permissions')->nullable()->comment('Storing Permission in JSON Format');
+            $table->text('description')->nullable()->comment('Description of the role');
             $table->timestamps(); // Create_at, Updated_at timestamps
             
             $table->index('created_at');

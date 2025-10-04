@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\ServerMode;
+use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class ServerModesSeeder extends Seeder
 {
@@ -13,41 +13,28 @@ class ServerModesSeeder extends Seeder
      */
     public function run(): void
     {
-        // Find the Super Admin user (from .env email)
-        $superAdminEmail = env('SUPERADMIN_EMAIL', 'superadmin@dev.com');
-        $superAdmin = DB::table('users')->where('email', $superAdminEmail)->first();
+        // Find the Super Admin user to attribute the action to.
+        $superAdmin = User::where('email', env('SUPERADMIN_EMAIL', 'superadmin@dev.com'))->first();
 
         if (!$superAdmin) {
-            $this->command->warn("⚠️ SuperAdmin not found. Using null for activated_by.");
+            $this->command->warn("⚠️ SuperAdmin not found. Cannot seed the initial server mode.");
             return;
         }
 
-        // Avoid duplicate entries
-        if (DB::table('server_modes')->exists()) {
-            $this->command->info("Server modes already seeded. Skipping.");
-            return;
-        }
+        // --- CORRECTED LOGIC ---
+        // We only want to seed ONE initial server mode. The 'firstOrCreate' method is
+        // perfect for this. It checks if any server mode exists. If not, it creates
+        // our specified default mode. If the table already has entries, it does nothing.
+        // This makes the seeder safe to run multiple times.
 
-        $modes = [
-            [   'mode' => 'onsite',
-                'activated_by' => $superAdmin ? $superAdmin->id : null,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ],
+        ServerMode::firstOrCreate(
+            [], // No conditions, we just want to check if the table is empty.
             [
-                'mode' => 'online',
-                'activated_by' => $superAdmin ? $superAdmin->id : null,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ],
-            [
-                'mode' => 'both',
-                'activated_by' => $superAdmin ? $superAdmin->id : null,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'mode' => 'onsite', // Set 'onsite' as the default starting mode.
+                'activated_by' => $superAdmin->id,
             ]
-        ];
+        );
 
-        DB::table('server_modes')->insert($modes);
+        $this->command->info("✅ Initial server mode ensured.");
     }
 }

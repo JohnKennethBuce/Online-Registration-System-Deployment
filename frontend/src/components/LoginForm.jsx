@@ -1,16 +1,25 @@
 import { useState } from "react";
-import useAuth from "../hooks/useAuth";
+import { useAuth } from "../context/AuthContext";
+
 
 export default function LoginForm() {
-  const { user, handleLogin, handleLogout } = useAuth();
+  // UPDATED: Use `login` and `logout` to match AuthContext
+  const { user, login, logout } = useAuth(); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const submitLogin = async (e) => {
     e.preventDefault();
     try {
-      await handleLogin(email, password);
-      alert("Login successful!");
+      // UPDATED: Call the `login` function
+      const success = await login(email, password); 
+      
+      // UPDATED: Redirect on success instead of showing an alert
+      if (success) {
+        window.location.href = "/dashboard";
+      } else {
+        alert("Invalid credentials!");
+      }
     } catch (err) {
       alert("Invalid credentials!");
     }
@@ -25,19 +34,22 @@ export default function LoginForm() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
           <button type="submit">Login</button>
         </form>
       ) : (
         <div>
           <h3>Welcome, {user.name} ({user.role?.name})</h3>
-          <button onClick={handleLogout}>Logout</button>
+          {/* UPDATED: Call the `logout` function */}
+          <button onClick={logout}>Logout</button>
         </div>
       )}
     </div>

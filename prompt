@@ -1,291 +1,1138 @@
-Taka look of my work flow ensure that I already Completed database we need to Create This Web 
+save all our data to your internal storage and update it when we updated it okay? 
 
-My WorkFlow 
+C:\Xamp-Jap\htdocs\Online_Registration_System\backend\app\Http\Controllers  
 
-React + Laravel One Hosting Setup
-How it works:
-1.	Build React app locally:
-2.	npm run build
-3.	Copy the /dist (Vite) or /build (CRA) folder contents into laravel/public/ (or laravel/resources/react for cleaner structure).
-4.	Laravel serves:
-o	/api/... → backend logic (Laravel API)
-o	/ and frontend routes → React’s index.html
-5.	Bluehost hosts everything as a single app at your domain.
-________________________________________
-🏗 Stack Plan
-Layer	Tech
-Frontend	React (Vite) + Tailwind UI
-Backend API	Laravel
-Database	MySQL (Bluehost)
-QR Gen	Laravel simple-qrcode (server-side)
-QR Scan	React react-qr-reader (browser)
-Printing	Laravel PDF (barryvdh/laravel-dompdf) OR React-to-print
-Emailing	Laravel Mail API (sends registration info + QR code)
-________________________________________
-⚙ Workflow
-Part 1 – Server Activation & Modes
-•	Superadmin selects server mode from dashboard:
-o	Onsite → Only Onsite page active.
-o	Online → Online registration + scanning page active.
-o	Both → Both Onsite and Online pages active.
-•	Registration type auto-assigned:
-o	If Server Mode = Onsite → Registrations tagged as Onsite.
-o	If Server Mode = Online → Registrations tagged as Online.
-•	Separate pages:
-o	/onsite → Kiosk registration interface.
-o	/online → Online registration interface.
-o	/scan → QR scanning & badge printing page (used in Online mode).
-________________________________________
-Part 2 – Registration Flows
-Unit 1 – POS Kiosk (Onsite)
-•	Public-facing kiosk — no staff needed during form filling.
-•	Flow:
-1.	User fills out registration form at kiosk.
-2.	System displays info for confirmation or edit.
-3.	After confirmation/edit:
-	Saves to DB in real time.
-	Badge/Ticket is generated (with QR) and automatically printed.
-________________________________________
-Unit 2 – Online Registration Station (Second POS)
-•	Public-facing web form — no staff needed during registration.
-•	Flow:
-1.	User registers online.
-2.	Info displayed for confirmation or edit.
-3.	After confirmation/edit:
-	Saves to DB in real time.
-	QR code is generated and displayed (user can save or print).
-4.	At event:
-	Staff scans QR code at /scan page.
-	System fetches record and automatically prints badge/ticket.
-________________________________________
-Part 3 – Admin/Superadmin Manual Registration
-•	Dropdown in registration form: Onsite, Online, Pre-Registered.
-•	After confirmation/edit:
-o	Saves to DB.
-o	Generates QR code.
-o	Sends email with registration details + QR code so attendee can present at Online station for badge printing.
-________________________________________
-Part 4 – Management System (Detailed)
-Roles & Permissions
-1. Super Admin (Full System Control)
-•	Server Activation Control
-o	Set Server Mode to:
-	Onsite only → Activates /onsite page.
-	Online only → Activates /online + /scan pages.
-	Both → Activates all three pages.
-o	Can switch modes instantly without downtime.
-•	Admin Management
-o	Create, edit, or delete Admin accounts.
-o	Assign/revoke permissions from Admins.
-o	Reset Admin passwords.
-•	Registration Configuration
-o	Enable/disable certain registration fields.
-o	Manage default values.
-o	Set badge/ticket printing templates.
-o	Configure QR code size, style, and embedded info.
-•	Registration Actions
-o	Create registrations manually with type dropdown: Onsite, Online, Pre-Registered.
-o	Edit or delete any registration.
-o	Trigger re-email of QR code and details.
-•	Email & Notification Settings
-o	Configure SMTP or email API keys.
-o	Customize email templates (for registration confirmation, QR delivery, reminders).
-•	System Monitoring
-o	View full user list (/api/users).
-o	View all activity logs (/api/logs).
-o	View system stats (/api/stats) — total registrations by type, per mode, per date range.
-o	View error logs (/api/error_logs).
-________________________________________
-2. Admin (Event Operations & Monitoring)
-•	Registration Management
-o	Create registrations manually with type dropdown: Onsite, Online, Pre-Registered.
-o	Edit any registration record.
-o	Trigger re-email of QR code and details.
-•	Monitoring
-o	View user list (registrations only, no access to Admin or Super Admin accounts).
-o	View activity logs (registrations only).
-o	View stats limited to registration counts, not system configuration.
-•	Operational Tools
-o	Access /scan page for scanning QR codes.
-o	Trigger badge/ticket printing for scanned QR codes.
-•	Restrictions
-o	Cannot change server mode.
-o	Cannot manage Admin or Super Admin accounts.
-o	Cannot alter email server configuration.
-________________________________________
-3. User (Attendee / Registrant)
-•	Self-Registration
-o	Can register via /onsite (kiosk) or /online (web form).
-o	Can confirm and edit their own details immediately after filling the form.
-•	QR Code Access
-o	Online registrants receive QR code on-screen and via email.
-o	Onsite registrants receive badge/ticket directly after confirmation.
-•	Scan & Print (Event Day)
-o	Online registrants present QR code for scanning at /scan station.
-o	Badge/ticket is printed after verification.
-•	Restrictions
-o	No access to /dashboard.
-o	No editing of registration after final confirmation (unless assisted by Admin/Super Admin).
-________________________________________
-/dashboard Sections
-1. User List (/api/users)
-•	Super Admin View: All users, all roles.
-•	Admin View: Registrations only.
-•	Columns: Name, Email, Phone, Type (Onsite, Online, Pre-Registered), Registration Date, Actions (Edit, Delete, Resend Email).
-2. Activity Logs (/api/logs)
-•	Records: Who registered, how (mode), timestamp, edits made, badge printing events, QR scans.
-•	Filter: Date range, registration type, action type.
-3. Stats (/api/stats)
-•	Super Admin: All stats, per mode, per date range, trends over time.
-•	Admin: Stats for registrations only.
-•	Metrics:
-o	Total Registrations (by type & date)
-o	Scans completed
-o	Badges printed
-o	Email delivery success rate
-________________________________________
-📦 Bluehost Deployment Strategy
-1.	Upload Laravel project to root hosting directory.
-2.	Place React build output into Laravel’s /public folder.
-3.	Update routes/web.php:
-4.	Route::get('/{any}', function () {
-5.	    return view('index'); // React index.html
-6.	})->where('any', '.*');
-7.	Keep API routes under /api/....
-________________________________________
-📂 Database Name: ors_maindb
-________________________________________
-1. Table: roles
-Stores role definitions (Super Admin, Admin, User).
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique role ID.
-name	VARCHAR(50)	UNIQUE, NOT NULL	Role name (e.g., superadmin, admin, user).
-permissions	JSON	NULL	Storing permissions in JSON format.
-description	TEXT	NULL	Role description.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-2. Table: users
-Stores all system users (Super Admin, Admin, and attendee accounts if needed).
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique user ID.
-role_id	BIGINT(20)	FK → roles.id, NOT NULL	User role.
-name	VARCHAR(100)	NOT NULL	Full name.
-email	VARCHAR(150)	UNIQUE, NOT NULL	Email address.
-email_verified_at	TIMESTAMP	NULL	Email verification date/time.
-password	VARCHAR(255)	NULL	Password (hashed).
-phone	VARCHAR(20)	NULL	Contact number.
-status	ENUM('active','inactive')	DEFAULT 'active'	Account status.
-remember_token	VARCHAR(100)	NULL	Token for "remember me" sessions.
-created_by	BIGINT(20)	FK → users.id, NULL	Who created this user.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-3. Table: registrations
-Stores attendee registration info and QR link.
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique registration ID.
-registered_by	BIGINT(20)	FK → users.id, NULL	User/Admin who created it (NULL if self-registration).
-first_name	VARCHAR(100)	NOT NULL	First name.
-last_name	VARCHAR(100)	NOT NULL	Last name.
-email	VARCHAR(150)	UNIQUE, NOT NULL	Attendee email.
-phone	VARCHAR(20)	NULL	Phone number.
-address	VARCHAR(255)	NULL	Address.
-registration_type	ENUM('onsite','online','pre_registered')	NOT NULL	Mode of registration.
-qr_code_path	VARCHAR(255)	NULL	Path/URL to QR code image.
-server_mode	ENUM('onsite','online','both')	DEFAULT 'onsite'	Server mode at time of registration.
-badge_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Badge print status.
-ticket_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Ticket print status.
-confirmed	TINYINT(1)	DEFAULT 0	0 = Pending, 1 = Confirmed.
-confirmed_by	BIGINT(20)	FK → users.id, NULL	Admin who confirmed registration.
-confirmed_at	TIMESTAMP	NULL	Date/time when confirmation happened.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-4. Table: logs
-Stores activity logs for tracking actions.
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique log ID.
-user_id	BIGINT(20)	FK → users.id, NULL	User/Admin who performed the action.
-action	VARCHAR(255)	NOT NULL	Action description.
-target_type	VARCHAR(50)	NULL	Target entity type (e.g., user, registration).
-target_id	BIGINT(20)	NULL	Related entity ID.
-ip_address	VARCHAR(45)	NULL	IP address of action.
-description	TEXT	NULL	Detailed description of the action.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time of action.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-5. Table: error_logs
-Stores system errors for debugging.
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique error log ID.
-user_id	BIGINT(20)	FK → users.id, NULL	User who experienced the error (if any).
-error_code	VARCHAR(50)	NULL	Optional error code.
-error_message	TEXT	NOT NULL	Error message details.
-stack_trace	LONGTEXT	NULL	Stack trace for debugging.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time of error.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-6. Table: server_modes
-Stores server activation modes set by Super Admin.
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique ID.
-mode	ENUM('onsite','online','both')	NOT NULL	Current mode.
-activated_by	BIGINT(20)	FK → users.id, NOT NULL	Super Admin who set the mode.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time set.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-7. Table: scans
-Stores QR scan events from /scan page.
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique scan ID.
-registration_id	BIGINT(20)	FK → registrations.id	Registration being scanned.
-scanned_by	BIGINT(20)	FK → users.id, NULL	Admin who scanned (NULL if auto).
-scan_time	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Date/time scanned.
-badge_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Badge print status for this scan.
-ticket_printed_status_id	BIGINT(20)	FK → print_statuses.id, NULL	Ticket print status for this scan.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-8. Table: print_statuses
-Stores configurable print status options (managed by Super Admin).
-Column Name	Type	Attributes	Description
-id	BIGINT(20)	PK, AI	Unique print status ID.
-type	ENUM('badge','ticket')	NOT NULL	Status type (badge or ticket).
-name	VARCHAR(50)	UNIQUE, NOT NULL	Status name (e.g., not_printed, printed, reprinted).
-description	TEXT	NULL	Status description.
-active	TINYINT(1)	DEFAULT 1	1 = Active, 0 = Disabled.
-created_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP	Creation date.
-updated_at	TIMESTAMP	DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP	Last update.
-________________________________________
-🔑 Foreign Key Relationships
-•	users.role_id → roles.id
-•	users.created_by → users.id
-•	registrations.registered_by → users.id
-•	registrations.confirmed_by → users.id
-•	registrations.badge_printed_status_id → print_statuses.id
-•	registrations.ticket_printed_status_id → print_statuses.id
-•	logs.user_id → users.id
-•	error_logs.user_id → users.id
-•	server_modes.activated_by → users.id
-•	scans.registration_id → registrations.id
-•	scans.scanned_by → users.id
-•	scans.badge_printed_status_id → print_statuses.id
-•	scans.ticket_printed_status_id → print_statuses.id
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\Registration;
+use App\Models\ServerMode;
+use App\Models\Scan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class DashboardController extends Controller
+{
+
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum'); // Ensure authenticated user
+    }
+    /**
+     * Dashboard summary (all key stats in one payload).
+     */
+    public function summary(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $isSuperAdmin = $user->role->name === 'superadmin';
+            $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
+
+            Log::info('Dashboard Summary accessed by:', [
+                'id'   => $user->id,
+                'user' => $user,
+                'role' => $user->role->name,
+                'permissions' => $user->role->permissions,
+                'mode' => $currentMode,
+            ]);
+
+            $baseQuery = fn ($q) => $isSuperAdmin ? $q : $q->where('registered_by', $user->id);
+
+            return response()->json([
+                'server_mode'           => $currentMode,
+                'registrations_by_type' => $baseQuery(Registration::select('registration_type', DB::raw('count(*) as total'))
+                    ->groupBy('registration_type'))->get(),
+                'confirmed_vs_pending'  => $baseQuery(Registration::select('confirmed', DB::raw('count(*) as total'))
+                    ->groupBy('confirmed'))->get(),
+                'badge_statuses'        => $baseQuery(Registration::select('badge_printed_status_id', DB::raw('count(*) as total'))
+                    ->groupBy('badge_printed_status_id'))->get(),
+                'ticket_statuses'       => $baseQuery(Registration::select('ticket_printed_status_id', DB::raw('count(*) as total'))
+                    ->groupBy('ticket_printed_status_id'))->get(),
+                'scans_per_user'        => $baseQuery(User::withCount('scans')
+                    ->select(['id', 'role_id', 'name', 'email', 'phone', 'status', 'created_by', 'created_at', 'updated_at']))->get(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Dashboard summary error: ' . $e->getMessage());
+            return response()->json([
+                'error'   => 'Failed to fetch dashboard summary',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ------------------------------
+    // Queries extracted as reusable functions with role filtering
+    // ------------------------------
+
+    private function getRegistrationsByType(bool $isSuperAdmin)
+    {
+        $query = Registration::select('registration_type', DB::raw('count(*) as total'))
+            ->groupBy('registration_type');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getConfirmedVsPending(bool $isSuperAdmin)
+    {
+        $query = Registration::select('confirmed', DB::raw('count(*) as total'))
+            ->groupBy('confirmed');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getBadgeStatuses(bool $isSuperAdmin)
+    {
+        $query = Registration::select('badge_printed_status_id', DB::raw('count(*) as total'))
+            ->groupBy('badge_printed_status_id');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getTicketStatuses(bool $isSuperAdmin)
+    {
+        $query = Registration::select('ticket_printed_status_id', DB::raw('count(*) as total'))
+            ->groupBy('ticket_printed_status_id');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getScansPerUser(bool $isSuperAdmin)
+    {
+        $query = User::withCount('scans')
+            ->select(['id', 'role_id', 'name', 'email', 'phone', 'status', 'created_by', 'created_at', 'updated_at']);
+        return $isSuperAdmin ? $query->get() : $query->where('id', Auth::id())->get();
+    }
+
+    // ------------------------------
+    // API endpoints reusing queries
+    // ------------------------------
+
+    public function registrationsBreakdown(): JsonResponse
+    {
+        try {
+            return response()->json($this->getRegistrationsByType(Auth::user()->role->name === 'superadmin'));
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Failed to fetch registration breakdown',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Detailed stats breakdown by ServerMode.
+     */
+
+     public function stats(): JsonResponse
+     {
+         try {
+             $user = Auth::user();
+             $isSuperAdmin = $user->role->name === 'superadmin';
+             $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
+ 
+             $baseQuery = fn ($q) => $isSuperAdmin ? $q : $q->where('registered_by', $user->id);
+ 
+             return response()->json([
+                 'server_mode' => $currentMode,
+                 'total_registrations' => $baseQuery(Registration::query())->count(),
+                 'by_mode' => Registration::select('server_mode', DB::raw('count(*) as total'))
+                     ->groupBy('server_mode')
+                     ->get(),
+                 'active_users' => $baseQuery(User::where('status', 'active'))->count(),
+                 'recent_scans' => Scan::where('scanned_time', '>', now()->subHours(24))->count(),
+             ]);
+         } catch (\Exception $e) {
+             Log::error('Stats error: ' . $e->getMessage());
+             return response()->json([
+                 'error'   => 'Failed to fetch stats',
+                 'message' => $e->getMessage()
+             ], 500);
+         }
+     }
+    
+
+    public function printStatusBreakdown(): JsonResponse
+    {
+        try {
+            $isSuperAdmin = Auth::user()->role->name === 'superadmin';
+            return response()->json([
+                'badge_statuses'  => $this->getBadgeStatuses($isSuperAdmin),
+                'ticket_statuses' => $this->getTicketStatuses($isSuperAdmin),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Failed to fetch print status breakdown',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Scans per user (admins & superadmin).
+     */
+    public function scansPerUser(): JsonResponse
+    {
+        try {
+            return response()->json($this->getScansPerUser(Auth::user()->role->name === 'superadmin'));
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Failed to fetch scans per user',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Logs endpoint for Super Admin.
+     */
+    public function logs(Request $request): JsonResponse
+    {
+        try {
+            if (Auth::user()->role->name !== 'superadmin') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $logs = Log::with('user')
+                ->when($request->input('action'), fn ($q) => $q->where('action', $request->input('action')))
+                ->when($request->input('target_type'), fn ($q) => $q->where('target_type', $request->input('target_type')))
+                ->when($request->input('user_id'), fn ($q) => $q->where('user_id', $request->input('user_id')))
+                ->latest()
+                ->paginate(50); // Paginate for better performance
+
+            return response()->json($logs);
+        } catch (\Exception $e) {
+            Log::error('Logs error: ' . $e->getMessage());
+            return response()->json([
+                'error'   => 'Failed to fetch logs',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload logos for badge/ticket (Super Admin only).
+     */
+    public function uploadLogo(Request $request): JsonResponse
+    {
+        try {
+            if (Auth::user()->role->name !== 'superadmin') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $request->validate([
+                'logo_type' => 'required|in:event,organizer,manager,registration',
+                'logo_file' => 'required|image|max:2048', // Max 2MB
+            ]);
+
+            $logoType = $request->input('logo_type');
+            $file = $request->file('logo_file');
+            $fileName = 'logos/' . time() . '_' . $logoType . '.' . $file->getClientOriginalExtension();
+
+            if (!Storage::disk('public')->exists('logos')) {
+                Storage::disk('public')->makeDirectory('logos');
+            }
+            Storage::disk('public')->put($fileName, file_get_contents($file));
+
+            Log::info('Logo uploaded', ['type' => $logoType, 'path' => '/storage/' . $fileName, 'user_id' => Auth::id()]);
+            return response()->json([
+                'message' => 'Logo uploaded successfully',
+                'path' => '/storage/' . $fileName,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Logo upload error: ' . $e->getMessage());
+            return response()->json([
+                'error'   => 'Failed to upload logo',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Retrieve available logos (for badge/ticket rendering).
+     */
+    public function getLogos(): JsonResponse
+    {
+        try {
+            $logos = Storage::disk('public')->files('logos');
+            $logoUrls = array_map(fn ($path) => '/storage/' . $path, $logos);
+            return response()->json(['logos' => $logoUrls]);
+        } catch (\Exception $e) {
+            Log::error('Get logos error: ' . $e->getMessage());
+            return response()->json([
+                'error'   => 'Failed to retrieve logos',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+} 
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Registration;
+use App\Models\PrintStatus;
+use App\Models\ServerMode;
+use App\Models\Scan;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use chillerlan\QRCode\QRCode;
+use chillerlan\QRCode\QROptions;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Crypt;
+
+class RegistrationController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum'); // Ensure authenticated user
+    }
+
+    public function index(): JsonResponse
+    {
+        $registrations = Registration::with(['badgeStatus', 'ticketStatus'])->get();
+        return response()->json(['registrations' => $registrations]);
+    }
+
+    public function store(Request $request): JsonResponse
+        {
+            $validated = $request->validate([
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:registrations,email',
+                'phone' => 'nullable|string|max:20',
+                'address' => 'nullable|string|max:255',
+                'registration_type' => 'required|in:onsite,online,pre-registered',
+            ]);
+        
+            // Check for duplicate email hash
+            $emailHash = hash('sha256', strtolower(trim($validated['email'])));
+            if (Registration::where('email_hash', $emailHash)->exists()) {
+                return response()->json(['error' => 'This email address is already registered.'], 409);
+            }
+        
+            // ServerMode validation
+            $serverMode = ServerMode::latest()->first();
+            if (!$serverMode) {
+                return response()->json(['error' => 'Server mode not configured.'], 500);
+            }
+            $allowedTypes = explode(',', str_replace('both', 'onsite,online', $serverMode->mode));
+            if (!in_array($validated['registration_type'], $allowedTypes)) {
+                return response()->json(['error' => 'Registration type not allowed in current mode'], 400);
+            }
+        
+            // PrintStatus setup
+            $badgeNotPrinted = PrintStatus::where('type', 'badge')->where('name', 'not_printed')->first();
+            $ticketNotPrinted = PrintStatus::where('type', 'ticket')->where('name', 'not_printed')->first();
+            if (!$badgeNotPrinted || !$ticketNotPrinted) {
+                return response()->json(['error' => 'Print statuses not configured.'], 500);
+            }
+        
+            // Create Registration first
+            $ticketNumber = 'TICKET-' . strtoupper(Str::random(12));
+            $registration = Registration::create([
+                'first_name' => Crypt::encryptString($validated['first_name']),
+                'last_name' => Crypt::encryptString($validated['last_name']),
+                'email' => Crypt::encryptString($validated['email']),
+                'email_hash' => $emailHash,
+                'phone' => $validated['phone'] ? Crypt::encryptString($validated['phone']) : null,
+                'address' => $validated['address'] ? Crypt::encryptString($validated['address']) : null,
+                'registration_type' => $validated['registration_type'],
+                'server_mode' => $serverMode->mode,
+                'badge_printed_status_id' => $badgeNotPrinted->id,
+                'ticket_printed_status_id' => $ticketNotPrinted->id,
+                'ticket_number' => $ticketNumber,
+                'registered_by' => Auth::id(),
+            ]);
+        
+            // ✅ Now generate QR Code after registration exists
+            $qrCodePath = 'qrcodes/' . $ticketNumber . '.png';
+            $qrContent = route('registrations.show', ['ticket_number' => $ticketNumber]);
+            $options = new QROptions([
+                'outputType'   => QRCode::OUTPUT_IMAGE_PNG,
+                'eccLevel'     => QRCode::ECC_H,
+                'scale'        => 6,
+                'imageBase64'  => false,
+            ]);
+            
+        
+            if (!Storage::disk('public')->exists('qrcodes')) {
+                Storage::disk('public')->makeDirectory('qrcodes');
+            }
+            (new QRCode($options))->render($qrContent, Storage::disk('public')->path($qrCodePath));
+        
+            // Update registration with QR path
+            $registration->update([
+                'qr_code_path' => $qrCodePath,
+            ]);
+        
+            Log::info('Registration created', [
+                'ticket_number' => $ticketNumber,
+                'user_id' => Auth::id(),
+                'mode' => $serverMode->mode
+            ]);
+        
+            return response()->json([
+                'message' => 'Registration successful',
+                'registration' => $registration->fresh(),
+                'qr_url' => asset('storage/'.$qrCodePath),
+            ], 201);
+        }
+        
+            public function show($ticketNumber): JsonResponse
+            {
+                $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+                return response()->json([
+                    'message' => 'Registration retrieved successfully',
+                    'registration' => $registration,
+                ]);
+            }
+
+        public function scan(Request $request): JsonResponse
+            {
+                $validated = $request->validate([
+                    'ticket_number' => 'required|string|exists:registrations,ticket_number',
+                ]);
+            
+                $registration = Registration::where('ticket_number', $validated['ticket_number'])->firstOrFail();
+                $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
+            
+                if ($registration->server_mode !== $currentMode && $currentMode !== 'both') {
+                    return response()->json(['error' => 'Scan not allowed in current mode'], 403);
+                }
+            
+                // --- Statuses ---
+                $badgeQueued   = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+                $badgePrinting = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+                $badgePrinted  = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+                $badgeReprinted= PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
+                $badgeFailed   = PrintStatus::where('type', 'badge')->where('name', 'failed')->first();
+            
+                $ticketQueued   = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+                $ticketPrinting = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+                $ticketPrinted  = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+                $ticketReprinted= PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
+                $ticketFailed   = PrintStatus::where('type', 'ticket')->where('name', 'failed')->first();
+            
+                if (!$badgeQueued || !$badgePrinting || !$badgePrinted || !$ticketQueued || !$ticketPrinting || !$ticketPrinted) {
+                    return response()->json(['error' => 'Print statuses not configured'], 400);
+                }
+            
+                // --- Create scan log ---
+                $scan = Scan::create([
+                    'registration_id' => $registration->id,
+                    'scanned_by' => Auth::id(),
+                    'scanned_time' => now(),
+                    'badge_printed_status_id' => $badgeQueued->id,
+                    'ticket_printed_status_id' => $ticketQueued->id,
+                ]);
+            
+                // --- Auto confirm if not already ---
+                if (!$registration->confirmed) {
+                    $registration->update([
+                        'confirmed' => true,
+                        'confirmed_by' => Auth::id(),
+                        'confirmed_at' => now(),
+                    ]);
+                }
+            
+                // ------------------------------------------------------
+                // ✅ Trigger print after scan (NOTED: print hook here)
+                // ------------------------------------------------------
+                try {
+                    // Badge flow
+                    if ($registration->badge_printed_status_id == $badgePrinted->id) {
+                        $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
+                    } else {
+                        $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                        $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+                    
+                        // 🚀 HERE you will dispatch actual badge print job
+                        $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
+                    }
+                
+                    // Ticket flow
+                    if ($registration->ticket_printed_status_id == $ticketPrinted->id) {
+                        $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
+                    } else {
+                        $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                        $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+                    
+                        // 🚀 HERE you will dispatch actual ticket print job
+                        $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+                    }
+                
+                    Log::info('Registration scanned & printed', [
+                        'ticket_number' => $validated['ticket_number'],
+                        'user_id' => Auth::id(),
+                        'mode' => $currentMode
+                    ]);
+                
+                } catch (\Exception $e) {
+                    if ($badgeFailed) $registration->update(['badge_printed_status_id' => $badgeFailed->id]);
+                    if ($ticketFailed) $registration->update(['ticket_printed_status_id' => $ticketFailed->id]);
+                
+                    Log::error('Printing failed after scan', [
+                        'ticket_number' => $validated['ticket_number'],
+                        'error' => $e->getMessage()
+                    ]);
+                
+                    return response()->json(['error' => 'Failed to print after scan'], 500);
+                }
+            
+                return response()->json([
+                    'message' => 'QR scanned → print triggered → marked printed/reprinted',
+                    'scan' => $scan,
+                    'registration' => $registration->fresh(),
+                ], 200);
+            }
+
+            public function printBadge($ticketNumber): JsonResponse
+            {
+                $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+            
+                $badgeQueued = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+                $badgePrinting = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+                $badgePrinted = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+                $badgeFailed = PrintStatus::where('type', 'badge')->where('name', 'failed')->first();
+            
+                if (!$badgeQueued || !$badgePrinting || !$badgePrinted) {
+                    return response()->json(['error' => 'Badge print statuses not configured'], 400);
+                }
+            
+                // Transition to queued
+                $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                Log::info('Badge print queued', ['ticket_number' => $ticketNumber]);
+            
+                try {
+                    // Transition to printing
+                    $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+            
+                    // 🚀 Simulate actual print job here (dispatch to printer)
+                    // If successful → mark printed
+                    $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
+            
+                    Log::info('Badge printed', ['ticket_number' => $ticketNumber, 'user_id' => Auth::id()]);
+                    return response()->json([
+                        'message' => 'Badge marked as printed',
+                        'registration' => $registration->fresh(),
+                    ], 200);
+            
+                } catch (\Exception $e) {
+                    if ($badgeFailed) {
+                        $registration->update(['badge_printed_status_id' => $badgeFailed->id]);
+                    }
+                    Log::error('Badge printing failed', ['ticket_number' => $ticketNumber, 'error' => $e->getMessage()]);
+                    return response()->json(['error' => 'Failed to print badge'], 500);
+                }
+            }
+
+            public function printTicket($ticketNumber): JsonResponse
+            {
+                $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+            
+                $ticketQueued = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+                $ticketPrinting = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+                $ticketPrinted = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+                $ticketFailed = PrintStatus::where('type', 'ticket')->where('name', 'failed')->first();
+            
+                if (!$ticketQueued || !$ticketPrinting || !$ticketPrinted) {
+                    return response()->json(['error' => 'Ticket print statuses not configured'], 400);
+                }
+            
+                // Transition to queued
+                $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                Log::info('Ticket print queued', ['ticket_number' => $ticketNumber]);
+            
+                try {
+                    // Transition to printing
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+                
+                    // 🚀 Simulate actual print job here (dispatch to printer)
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+                
+                    Log::info('Ticket printed', ['ticket_number' => $ticketNumber, 'user_id' => Auth::id()]);
+                    return response()->json([
+                        'message' => 'Ticket marked as printed',
+                        'registration' => $registration->fresh(),
+                    ], 200);
+                
+                } catch (\Exception $e) {
+                    if ($ticketFailed) {
+                        $registration->update(['ticket_printed_status_id' => $ticketFailed->id]);
+                    }
+                    Log::error('Ticket printing failed', ['ticket_number' => $ticketNumber, 'error' => $e->getMessage()]);
+                    return response()->json(['error' => 'Failed to print ticket'], 500);
+                }
+            } 
+
+             /**
+     * Unified: Scan QR + Auto print Badge
+     */
+    public function scanAndPrintBadge($ticketNumber): JsonResponse
+    {
+        $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+
+        $badgeQueued   = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+        $badgePrinting = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+        $badgePrinted  = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+        $badgeReprinted= PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
+        $badgeFailed   = PrintStatus::where('type', 'badge')->where('name', 'failed')->first();
+
+        if (!$badgeQueued || !$badgePrinting || !$badgePrinted) {
+            return response()->json(['error' => 'Badge print statuses not configured'], 400);
+        }
+
+        // --- Create scan log
+        $scan = Scan::create([
+            'registration_id' => $registration->id,
+            'scanned_by' => Auth::id(),
+            'scanned_time' => now(),
+            'badge_printed_status_id' => $badgeQueued->id,
+        ]);
+
+        try {
+            // If already printed → mark as reprinted
+            if ($registration->badge_printed_status_id == $badgePrinted->id) {
+                $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
+            } else {
+                $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+
+                // 🚀 Simulate print here
+                $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
+            }
+
+            Log::info('Scan + badge print complete', [
+                'ticket_number' => $ticketNumber,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'message' => 'Scanned → Badge printed',
+                'scan' => $scan,
+                'registration' => $registration->fresh(),
+            ], 200);
+
+        } catch (\Exception $e) {
+            if ($badgeFailed) {
+                $registration->update(['badge_printed_status_id' => $badgeFailed->id]);
+            }
+            Log::error('Badge printing failed after scan', [
+                'ticket_number' => $ticketNumber,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Failed to print badge after scan'], 500);
+        }
+    }
+
+    /**
+     * Unified: Scan QR + Auto print Ticket
+     */
+    public function scanAndPrintTicket($ticketNumber): JsonResponse
+    {
+        $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+
+        $ticketQueued   = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+        $ticketPrinting = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+        $ticketPrinted  = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+        $ticketReprinted= PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
+        $ticketFailed   = PrintStatus::where('type', 'ticket')->where('name', 'failed')->first();
+
+        if (!$ticketQueued || !$ticketPrinting || !$ticketPrinted) {
+            return response()->json(['error' => 'Ticket print statuses not configured'], 400);
+        }
+
+        // --- Create scan log
+        $scan = Scan::create([
+            'registration_id' => $registration->id,
+            'scanned_by' => Auth::id(),
+            'scanned_time' => now(),
+            'ticket_printed_status_id' => $ticketQueued->id,
+        ]);
+
+        try {
+            // If already printed → mark as reprinted
+            if ($registration->ticket_printed_status_id == $ticketPrinted->id) {
+                $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
+            } else {
+                $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+
+                // 🚀 Simulate print here
+                $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+            }
+
+            Log::info('Scan + ticket print complete', [
+                'ticket_number' => $ticketNumber,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'message' => 'Scanned → Ticket printed',
+                'scan' => $scan,
+                'registration' => $registration->fresh(),
+            ], 200);
+
+        } catch (\Exception $e) {
+            if ($ticketFailed) {
+                $registration->update(['ticket_printed_status_id' => $ticketFailed->id]);
+            }
+            Log::error('Ticket printing failed after scan', [
+                'ticket_number' => $ticketNumber,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Failed to print ticket after scan'], 500);
+        }
+    }
+} 
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\ServerMode;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+
+class ServerModeController extends Controller
+{
+    /**
+     * Get the current (latest) server mode.
+     * This is what the entire application will check against.
+     */
+    public function getCurrentMode(): JsonResponse
+    {
+        $currentMode = ServerMode::latest()->with('activatedBy:id,name')->first();
+
+        if (!$currentMode) {
+            return response()->json(['error' => 'Server mode is not configured.'], 404);
+        }
+
+        return response()->json([
+            'message' => 'Current server mode retrieved.',
+            'current_mode' => $currentMode,
+        ]);
+    }
+
+    /**
+     * Set a new server mode. This creates a new record, effectively
+     * making it the latest and current mode.
+     * Restricted to Superadmins only.
+     */
+    public function setMode(Request $request): JsonResponse
+    {
+        // Use the 'superadmin-only' Gate for authorization
+        if (!Gate::allows('superadmin-only')) {
+            abort(403, 'This action is unauthorized.');
+        }
+
+        $validated = $request->validate([
+            'mode' => 'required|string|in:onsite,online,both',
+        ]);
+
+        // Create a new mode entry, which becomes the current active mode
+        $newMode = ServerMode::create([
+            'mode' => $validated['mode'],
+            'activated_by' => Auth::id(),
+        ]);
+
+        return response()->json([
+            'message' => 'Server mode successfully updated.',
+            'new_mode' => $newMode->load('activatedBy:id,name'),
+        ], 201);
+    }
+
+    /**
+     * Get the history of all server mode changes, paginated.
+     * Useful for an audit log in the admin panel.
+     */
+    public function getHistory(): JsonResponse
+    {
+        $history = ServerMode::latest()
+            ->with('activatedBy:id,name')
+            ->paginate(15); // Paginate for performance
+
+        return response()->json($history);
+    }
+} 
 
 
- 	🔄 Updated Process Flow
-Step	Description
-1	Superadmin selects server mode (Onsite, Online, Both).
-2	Visitor registers (either via kiosk or online form).
-3	System shows confirmation/edit screen.
-4	Onsite: After confirmation, badge/ticket printed immediately.
-5	Online: After confirmation, QR code shown + emailed to user.
-6	At event, staff scans QR → badge/ticket printed.
-7	Admin/Superadmin can manually register users and send QR via email.
-________________________________________ 
+C:\Xamp-Jap\htdocs\Online_Registration_System\backend\app\Models 
+<?php
 
-What I've Created 
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Log extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id', 'action', 'target_type', 'target_id', 
+        'ip_address', 'description' 
+    ];
+
+    // Relationships
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+} 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class PrintStatus extends Model
+{
+    use HasFactory;
+
+    protected $fillable =[
+        'type', 'name', 'description', 'active',
+    ];
+
+    protected $casts = [
+        'active' => 'boolean',
+    ];
+
+    // relationships    
+    
+    public function registrationsBadge()
+    {
+        return $this->hasMany(Registration::class, 'badge_printed_status_id');
+    }
+
+    public function registrationsTicket()
+    {
+        return $this->hasMany(Registration::class, 'ticket_printed_status_id');
+    }
+
+    public function scansAsBadge()
+    {
+        return $this->hasMany(Scan::class, 'badge_printed_status_id');
+    }
+
+    public function scansAsTicket()
+    {
+        return $this->hasMany(Scan::class, 'ticket_printed_status_id');
+    }
+
+} 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Crypt;
+
+class Registration extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'first_name', 'last_name', 'email', 'phone', 'address',
+        'registration_type', 'server_mode', 'qr_code_path',
+        'ticket_number', 'confirmed_at', 'email_hash',
+    ];
+
+    protected $guarded = [
+        'badge_printed_status_id', 'ticket_printed_status_id',
+        'confirmed', 'confirmed_by', 'registered_by',
+    ];
+
+    protected $casts = [
+        'confirmed'    => 'boolean',
+        'confirmed_at' => 'datetime',
+        'created_at'   => 'datetime',  
+        'updated_at'   => 'datetime',  
+    ];
+
+    /* ---------------------------
+     |  Encrypt / Decrypt Fields
+     |----------------------------*/
+    public function setFirstNameAttribute($value)
+    {
+        $this->attributes['first_name'] = Crypt::encryptString($value);
+    }
+    public function getFirstNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setLastNameAttribute($value)
+    {
+        $this->attributes['last_name'] = Crypt::encryptString($value);
+    }
+    public function getLastNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = Crypt::encryptString($value);
+    }
+    public function getEmailAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
+    }
+    public function getPhoneAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function setAddressAttribute($value)
+    {
+        $this->attributes['address'] = $value ? Crypt::encryptString($value) : null;
+    }
+    public function getAddressAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    /* ---------------------------
+     |  Relationships
+     |----------------------------*/
+    public function confirmedBy()
+    {
+        return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function registeredBy()
+    {
+        return $this->belongsTo(User::class, 'registered_by');
+    }
+
+    public function scans()
+    {
+        return $this->hasMany(Scan::class);
+    }
+
+    public function badgeStatus()
+    {
+        return $this->belongsTo(PrintStatus::class, 'badge_printed_status_id');
+    }
+
+    public function ticketStatus()
+    {
+        return $this->belongsTo(PrintStatus::class, 'ticket_printed_status_id');
+    }
+} 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Role extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'name', 'permissions', 'description',
+    ];
+
+    protected $casts = [
+        'permissions' => 'array',  // JSON to array
+    ];
+
+    // Relationship
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+} 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Scan extends Model
+{
+    use HasFactory;
+
+    protected $fillable =[
+        'registration_id', 'scanned_by', 'scanned_time', 'badge_printed_status_id',
+        'ticket_printed_status_id'
+    ];
+
+    protected $casts = [
+        'scanned_time' => 'datetime',
+        'created_at'  => 'datetime',
+        'updated_at'  => 'datetime',
+    ];
+
+    //relationships
+
+    public function registration()
+    {
+        return $this->belongsTo(Registration::class);
+    }
+
+    public function scannedBy()
+    {
+        return $this->belongsTo(User::class, 'scanned_by');
+    }
+
+    public function badgeStatus()
+    {
+        return $this->belongsTo(PrintStatus::class, 'badge_printed_status_id');
+    }
+
+    public function ticketStatus()
+    {
+        return $this->belongsTo(PrintStatus::class, 'ticket_printed_status_id');
+    }
+} 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class ServerMode extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['mode', 'activated_by'];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    // relationship
+    public function activatedBy()
+    {
+        return $this->belongsTo(User::class, 'activated_by');
+    }
+} 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Crypt;
+
+class User extends Authenticatable
+{
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * Always eager load these relationships.
+     *
+     * This ensures Auth::user() and Sanctum tokens
+     * always include the role without lazy-loading issues.
+     */
+    protected $with = ['role'];
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'name',
+        'email',
+        'phone',
+        'password',
+    ];
+
+    protected $guarded = [
+        'role_id',
+        'status',
+        'created_by',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    // Added phone encryption
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getPhoneAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+    // 🔹 Relationships
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    public function registrations()
+    {
+        return $this->hasMany(Registration::class, 'registered_by');
+    }
+
+    public function scans()
+    {
+        return $this->hasMany(Scan::class, 'scanned_by');
+    }
+
+    public function logs()
+    {
+        return $this->hasMany(Log::class);
+    }
+} 
+
+
+C:\Xamp-Jap\htdocs\Online_Registration_System\backend\database\migrations
 
 <?php
 
@@ -295,31 +1142,31 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('roles', function (Blueprint $table) {
-            $table->id(); // Primary key
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('roles', function (Blueprint $table) {
+            $table->id(); // Primary key
 
-            // Role Details
-            $table->string('name', 50)->unique(); // Role name: Super Admin, Admin, User
-            $table->json('permissions')->nullable(); // storing Permission in JSON Format
-            $table->text('description')->nullable(); // Description of the role
-            $table->timestamps(); // Create_at, Updated_at timestamps
-            
-            $table->index('created_at');
-        });
-    }
+            // Role Details
+            $table->string('name', 50)->unique()->comment('Role name: Super Admin, Admin, User'); // Added unique constraint
+            $table->json('permissions')->nullable()->comment('Storing Permission in JSON Format');
+            $table->text('description')->nullable()->comment('Description of the role');
+            $table->timestamps(); // Create_at, Updated_at timestamps
+            
+            $table->index('created_at');
+        });
+    }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('roles');
-    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('roles');
+    }
 }; 
 
 <?php
@@ -330,64 +1177,60 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('users', function (Blueprint $table) {
-            
-            $table->id();
-            // Link to roles table
-            $table->foreignId('role_id')-> constrained ('roles')->cascadeOnUpdate()->restrictionOnDelete();
-            
-            // User basic information
-            $table->string('name'); // Full name of the user
-            $table->string('email')->unique(); // Unique email address for the user
-            $table->timestamp('email_verified_at')->nullable(); // Timestamp when the email was verified
-            $table->string('password', 255)->nullable(); // Keep nullable if some users (attendees) don’t need login 
-            $table->string('phone', 20)->nullable();
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            // Link to roles table
+            $table->foreignId('role_id')->constrained('roles')->cascadeOnUpdate()->restrictOnDelete();
+            
+            // User basic information
+            $table->string('name'); // Full name of the user
+            $table->string('email')->unique()->index(); // Added index for search performance
+            $table->timestamp('email_verified_at')->nullable(); // Timestamp when the email was verified
+            $table->string('password', 255)->nullable(); // Keep nullable if some users (attendees) don’t need login 
+            $table->string('phone', 1000)->nullable(); // Increased length for encryption
 
-            // User account status
-            $table->enum('status', ['active', 'inactive'])->default('active')->index(); 
+            // User account status
+            $table->enum('status', ['active', 'inactive'])->default('active')->index(); 
 
-            // Remember token for password reset
-            $table->rememberToken();
+            // Remember token for password reset
+            $table->rememberToken();
 
-            // Track who created this user (self-referencing FK)
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            // Track who created this user (self-referencing FK)
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
 
-            $table->timestamps();
-            
-            
-        });
+            $table->timestamps();
+        });
 
-        Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email', 150)->primary();
-            $table->string('token');
-            $table->timestamp('created_at')->nullable();
-        });
+        Schema::create('password_reset_tokens', function (Blueprint $table) {
+            $table->string('email', 150)->primary();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
+        });
 
-        Schema::create('sessions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->foreignId('user_id')->nullable()->index();
-            $table->string('ip_address', 45)->nullable();
-            $table->text('user_agent')->nullable();
-            $table->longText('payload');
-            $table->integer('last_activity')->index();
-        });
-    }
+        Schema::create('sessions', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->foreignId('user_id')->nullable()->index();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity')->index();
+        });
+    }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
-        Schema::dropIfExists('sessions');
-
-    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('sessions');
+    }
 }; 
 
 <?php
@@ -398,32 +1241,191 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('cache', function (Blueprint $table) {
-            $table->string('key')->primary();
-            $table->mediumText('value');
-            $table->integer('expiration');
-        });
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('cache', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
 
-        Schema::create('cache_locks', function (Blueprint $table) {
-            $table->string('key')->primary();
-            $table->string('owner');
-            $table->integer('expiration');
-        });
-    }
+        Schema::create('cache_locks', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->string('owner');
+            $table->integer('expiration');
+        });
+    }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('cache');
-        Schema::dropIfExists('cache_locks');
-    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('cache');
+        Schema::dropIfExists('cache_locks');
+    }
+}; 
+
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts');
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
+        Schema::create('job_batches', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->string('name');
+            $table->integer('total_jobs');
+            $table->integer('pending_jobs');
+            $table->integer('failed_jobs');
+            $table->longText('failed_job_ids');
+            $table->mediumText('options')->nullable();
+            $table->integer('cancelled_at')->nullable();
+            $table->integer('created_at');
+            $table->integer('finished_at')->nullable();
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->unique();
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('job_batches');
+        Schema::dropIfExists('failed_jobs');
+    }
+}; 
+
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('print_statuses', function (Blueprint $table) {
+            $table->id(); // Primary Key
+
+            // Badge or Ticket status
+            $table->enum('type', ['badge', 'ticket'])
+                  ->comment('Defines whether this status applies to badges or tickets');
+
+            // Status name (unique within type)
+            $table->string('name', 50)
+                  ->comment('E.g., not_printed, printed, reprinted');
+
+            $table->text('description')->nullable()
+                  ->comment('Optional description of the status meaning');
+
+            // Active flag
+            $table->tinyInteger('active')->default(1)
+                 ->comment('1 = Active, 0 = Disabled');  // Added comment
+
+            // Timestamps
+            $table->timestamps();
+
+            // Constraints & Indexes
+            $table->unique(['type', 'name']); // Prevent duplicate status names for same type
+            $table->index('type'); // Quick lookups by type
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('print_statuses');
+    }
+}; 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::create('registrations', function (Blueprint $table) {
+            $table->id();
+
+            // Encrypted personal info
+            $table->text('first_name');
+            $table->text('last_name');
+            $table->text('email');
+            $table->text('phone')->nullable();
+            $table->text('address')->nullable();
+
+            $table->enum('registration_type', ['onsite','online','pre-registered'])->index();
+
+            // Ticket / QR
+            $table->string('ticket_number', 100)->unique()->nullable();
+            $table->string('qr_code_path', 255)->nullable();
+
+            $table->enum('server_mode', ['onsite','online','both'])->default('onsite')->index();
+
+            // Print statuses
+            $table->foreignId('badge_printed_status_id')->nullable()
+                  ->constrained('print_statuses')->nullOnDelete();
+            $table->foreignId('ticket_printed_status_id')->nullable()
+                  ->constrained('print_statuses')->nullOnDelete();
+
+            // Confirmation
+            $table->boolean('confirmed')->default(false);
+            $table->foreignId('confirmed_by')->nullable()
+                  ->constrained('users')->nullOnDelete();
+            $table->timestamp('confirmed_at')->nullable();
+
+            // Who registered
+            $table->foreignId('registered_by')->nullable()
+                  ->constrained('users')->nullOnDelete();
+
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('registrations');
+    }
 }; 
 
 <?php
@@ -434,54 +1436,43 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('jobs', function (Blueprint $table) {
-            $table->id();
-            $table->string('queue')->index();
-            $table->longText('payload');
-            $table->unsignedTinyInteger('attempts');
-            $table->unsignedInteger('reserved_at')->nullable();
-            $table->unsignedInteger('available_at');
-            $table->unsignedInteger('created_at');
-        });
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('logs', function (Blueprint $table) {
+            $table->id(); // Primary key
+            
+            // actor of the action
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete(); // User who performed the action
+            
+            // action metadata
+            $table->string('action', 255); // short action name 
+            $table->string('target_type', 50)->nullable(); // Type of the target entity (e.g., 'registration', 'user', etc.)
+            $table->unsignedBigInteger('target_id')->nullable(); // Related entity ID
 
-        Schema::create('job_batches', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('name');
-            $table->integer('total_jobs');
-            $table->integer('pending_jobs');
-            $table->integer('failed_jobs');
-            $table->longText('failed_job_ids');
-            $table->mediumText('options')->nullable();
-            $table->integer('cancelled_at')->nullable();
-            $table->integer('created_at');
-            $table->integer('finished_at')->nullable();
-        });
+            // IP address 
+            $table->string('ip_address', 45)->nullable(); // IP address of the user performing the action
+            $table->text('description')->nullable(); // Detailed description of the action
+            
+            $table->timestamps();
 
-        Schema::create('failed_jobs', function (Blueprint $table) {
-            $table->id();
-            $table->string('uuid')->unique();
-            $table->text('connection');
-            $table->text('queue');
-            $table->longText('payload');
-            $table->longText('exception');
-            $table->timestamp('failed_at')->useCurrent();
-        });
-    }
+            // Indexes for performance
+            $table->index('action');
+            $table->index('created_at');
+            $table->index('user_id');  // Added
+            $table->index(['target_type', 'target_id']);  // Added composite index
+        });
+    }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('jobs');
-        Schema::dropIfExists('job_batches');
-        Schema::dropIfExists('failed_jobs');
-    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('logs');
+    }
 }; 
 
 <?php
@@ -492,40 +1483,35 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('print_statuses', function (Blueprint $table) {
-            $table->id(); // Primary Key
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('error_logs', function (Blueprint $table) {
+            $table->id();
 
-            // Badge or Ticket status
-            $table->enum('type', ['badge', 'ticket'])
-                  ->comment('Defines whether this status applies to badges or tickets');
+            // user who experienced the error (nullable)
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
 
-            // Status name (unique within type)
-            $table->string('name', 50)
-                  ->comment('E.g., not_printed, printed, reprinted');
+            // Error details
+            $table->string('error_code', 50)->nullable(); // Optional Error Code 
+            $table->text('error_message'); // Detailed error message
+            $table->longText('stack_trace')->nullable(); // Stack trace for debugging (optional)
 
-            $table->text('description')->nullable()
-                  ->comment('Optional description of the status meaning');
+            $table->timestamps();
 
-            // Timestamps
-            $table->timestamps();
+            $table->index('created_at'); // Index for performance
+        }); 
+    }
 
-            // Constraints & Indexes
-            $table->unique(['type', 'name']); // Prevent duplicate status names for same type
-            $table->index('type'); // Quick lookups by type
-        });
-    }
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('print_statuses');
-    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('error_logs');
+    }
 }; 
 
 <?php
@@ -536,55 +1522,37 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('registrations', function (Blueprint $table) {
-            
-            $table->id();
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('server_modes', function (Blueprint $table) {
+            $table->id();
 
-            // Basic information about the registrant
-            $table->string('first_name', 100); // First name of the registrant
-            $table->string('last_name', 100); // Last name of the registrant
-            $table->string('email', 150)->unique(); //unique email of the registrant
-            $table->string('phone', 20)->nullable(); // Phone number of the registrant
-            $table->string('address', 255)->nullable(); // Address of the registrant
+            // Mode set by Super Admin
+            $table->enum('mode', ['onsite', 'online', 'both'])->index();  // Added index
 
-            // Registration type auto-assigned based on server mode
-            $table->enum('registration_type', ['onsite', 'online', 'pre-registered'])->index();
+            // who activated this mode
+            $table->foreignId('activated_by')
+                  ->nullable()
+                  ->constrained('users')
+                  ->cascadeOnUpdate()
+                  ->nullOnDelete();
+            $table->timestamps();
 
-            //QR / Ticket identifiers
-            $table->string('ticket_number', 100)->unique()->nullable(); // Unique ticket number for printing badges/tickets
-            $table->string('qr_code_path', 255)->nullable(); // Path to the QR code image for this registration
+            // Indexes for Reporting
+            $table->index('created_at');
+        });
+    }
 
-            // Server mode at time of registration (historical snapshot)
-            $table->enum('server_mode', ['onsite','online','both'])->default('onsite')->index();
-            
-            // Badge / Ticket printing status (configurable via print_statuses) 
-            $table->foreignId('badge_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
-            $table->foreignId('ticket_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
-
-            // confirmation tracking
-            $table->tinyInteger('confirmed')->default(0); // 0 = pending, 1 = confirmed
-            $table->foreignId('confirmed_by')->nullable()->constrained('users')->nullOnDelete(); // User who confirmed this registration
-            $table->timestamp('confirmed_at')->nullable();
-
-            // who registered this user 
-            $table->foreignId('registered_by')->nullable()->constrained('users')->nullOnDelete(); // User who registered this attendee
-
-            $table->timestamps();
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('registrations');
-    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('server_modes');
+    }
 }; 
 
 <?php
@@ -595,41 +1563,44 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('logs', function (Blueprint $table) {
-            $table->id(); // Primary key
-            
-            // actor of the action
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete(); // User who performed the action
-            
-            // action metadata
-            $table->string('action', 255); //short action name 
-            $table->string('target_type', 50)->nullable(); // Type of the target entity (e.g., 'registration', 'user', etc.)
-            $table->unsignedBigInteger('target_id')->nullable(); // Related entity ID
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('scans', function (Blueprint $table) {
+            $table->id();
+           
+            // Registration being Scanned
+            $table->foreignId('registration_id')->constrained('registrations')->cascadeOnDelete();
 
-            // IP address 
-            $table->string('ip_address', 45)->nullable(); // IP address of the user performing the action
-            $table->text('description')->nullable(); // Detailed description of the action
-            
-            $table->timestamps();
+            // Who scanned (nullable, e.g. Auto scan)
+            $table->foreignId('scanned_by')->nullable()->constrained('users')->nullOnDelete();
 
-            // Indexes for performance
-            $table->index('action');
-            $table->index('created_at');
-        });
-    }
+            // When it was scanned
+            $table->timestamp('scanned_time')->useCurrent();
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('logs');
-    }
+            // Badge / Ticket printing status (configurable via print_statuses)
+            $table->foreignId('badge_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
+            $table->foreignId('ticket_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
+
+            $table->timestamps();
+
+            // Indexes for performance
+            $table->index('scanned_time');
+            $table->index(['registration_id', 'badge_printed_status_id']);
+            $table->index(['registration_id', 'ticket_printed_status_id']);
+            $table->index('scanned_by');  // Added
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('scans');
+    }
 }; 
 
 <?php
@@ -640,35 +1611,30 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('error_logs', function (Blueprint $table) {
-            $table->id();
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->morphs('tokenable');
+            $table->text('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable()->index();
+            $table->timestamps();
+        });
+    }
 
-            // user who experienced the error (nullable)
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-
-            // Error details
-            $table->string('error_code', 50)->nullable(); // Optional Error Code 
-            $table->text('error_message'); // Detailed error message
-            $table->longText('stack_trace')->nullable(); // Stack trace for debugging (optional)
-
-            $table->timestamps();
-
-            $table->index('created_at'); // Index for performance
-        }); 
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('error_logs');
-    }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('personal_access_tokens');
+    }
 }; 
 
 <?php
@@ -679,116 +1645,27 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('server_modes', function (Blueprint $table) {
-            $table->id();
+    public function up(): void
+    {
+        Schema::table('registrations', function (Blueprint $table) {
+            // This column will store a hash of the email for fast, unique lookups.
+            // It should not be nullable as our application logic always provides it.
+            $table->string('email_hash')->after('email')->unique()->nullable(false);
+        });
+    }
 
-            // Mode set by Super Admin
-            $table->enum('mode', ['onsite', 'online', 'both'])->index();
-
-            // who activated this mode 
-            $table->foreignId('activated_by')->constrained('users')->cascadeOnUpdate()->restrictOnDelete();
-
-            $table->timestamps();
-
-            // Indexes for Reporting
-            $table->index('created_at');
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('server_modes');
-    }
-}; 
-
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('scans', function (Blueprint $table) {
-            $table->id();
-           
-            // Registration being Scanned
-            $table->foreignId('registration_id')->constrained('registrations')->cascadeOnDelete();
-
-            // Who scaned (nullable, e.g. Auto scan)
-            $table->foreignId('scanned_by')->nullable()->constrained('users')->nullOnDelete();
-
-            // When it was scanned
-            $table->timestamp('scanned_time')->useCurrent();
-
-            // Badge / Ticket printing status (configurable via print_statuses)
-            $table->foreignId('badge_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
-            $table->foreignId('ticket_printed_status_id')->nullable()->constrained('print_statuses')->nullOnDelete();
-
-            $table->timestamps();
-
-            // Indexes for performance
-            $table->index('scanned_time');
-            $table->index(['registration_id', 'badge_printed_status_id']);
-            $table->index(['registration_id', 'ticket_printed_status_id']);
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('scans');
-    }
-}; 
-
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('personal_access_tokens', function (Blueprint $table) {
-            $table->id();
-            $table->morphs('tokenable');
-            $table->text('name');
-            $table->string('token', 64)->unique();
-            $table->text('abilities')->nullable();
-            $table->timestamp('last_used_at')->nullable();
-            $table->timestamp('expires_at')->nullable()->index();
-            $table->timestamps();
-        });
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('personal_access_tokens');
-    }
+    public function down(): void
+    {
+        Schema::table('registrations', function (Blueprint $table) {
+            // Ensure we check if the column exists before trying to drop it.
+            if (Schema::hasColumn('registrations', 'email_hash')) {
+                $table->dropColumn('email_hash');
+            }
+        });
+    }
 };
 
 
-09/24/25
+save data first as I command no Configurations needed, Just save all the data until I say 'develop' 
+
+

@@ -13,15 +13,15 @@ class TruncateTablesSeeder extends Seeder
      */
     public function run(): void
     {
-        // Disable foreign key checks
         Schema::disableForeignKeyConstraints();
 
-        // Now you can safely truncate the tables
         DB::table('scans')->truncate();
         DB::table('registrations')->truncate();
-        // Add any other tables you need to truncate here
+        DB::table('users')->truncate(); // Added to clear users
+        DB::table('logs')->truncate(); // Added to clear logs
+        DB::table('error_logs')->truncate(); // Added to clear error logs
+        DB::table('server_modes')->truncate(); // Added to clear server modes
 
-        // Re-enable foreign key checks
         Schema::enableForeignKeyConstraints();
     }
 }

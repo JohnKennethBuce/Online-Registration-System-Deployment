@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete(); // User who performed the action
             
             // action metadata
-            $table->string('action', 255); //short action name 
+            $table->string('action', 255); // short action name 
             $table->string('target_type', 50)->nullable(); // Type of the target entity (e.g., 'registration', 'user', etc.)
             $table->unsignedBigInteger('target_id')->nullable(); // Related entity ID
 
@@ -31,6 +31,8 @@ return new class extends Migration
             // Indexes for performance
             $table->index('action');
             $table->index('created_at');
+            $table->index('user_id');  // Added
+            $table->index(['target_type', 'target_id']);  // Added composite index
         });
     }
 

@@ -11,9 +11,9 @@ class Registration extends Model
     use HasFactory;
 
     protected $fillable = [
-        'first_name', 'last_name', 'email', 'phone', 'address',
+        'first_name', 'last_name', 'email', 'phone', 'address', 'company_name',
         'registration_type', 'server_mode', 'qr_code_path',
-        'ticket_number', 'confirmed_at',
+        'ticket_number', 'confirmed_at', 'email_hash',
     ];
 
     protected $guarded = [
@@ -24,7 +24,19 @@ class Registration extends Model
     protected $casts = [
         'confirmed'    => 'boolean',
         'confirmed_at' => 'datetime',
+        'created_at'   => 'datetime',  
+        'updated_at'   => 'datetime',  
     ];
+
+    // Add these methods inside the Registration model class
+    public function setCompanyNameAttribute($value)
+    {
+        $this->attributes['company_name'] = $value ? Crypt::encryptString($value) : null;
+    }
+    public function getCompanyNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
     /* ---------------------------
      |  Encrypt / Decrypt Fields

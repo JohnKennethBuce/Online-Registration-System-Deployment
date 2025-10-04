@@ -12,17 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            
             $table->id();
             // Link to roles table
-            $table->foreignId('role_id')-> constrained ('roles')->cascadeOnUpdate()->restrictionOnDelete();
+            $table->foreignId('role_id')->constrained('roles')->cascadeOnUpdate()->restrictOnDelete();
             
             // User basic information
             $table->string('name'); // Full name of the user
-            $table->string('email')->unique(); // Unique email address for the user
+            $table->string('email')->unique()->index(); // Added index for search performance
             $table->timestamp('email_verified_at')->nullable(); // Timestamp when the email was verified
             $table->string('password', 255)->nullable(); // Keep nullable if some users (attendees) don’t need login 
-            $table->string('phone', 20)->nullable();
+            $table->string('phone', 1000)->nullable(); // Increased length for encryption
 
             // User account status
             $table->enum('status', ['active', 'inactive'])->default('active')->index(); 
@@ -34,8 +33,6 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamps();
-            
-            
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -62,6 +59,5 @@ return new class extends Migration
         Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
-
     }
 };

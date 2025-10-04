@@ -12,7 +12,6 @@ class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        // 🔹 fetch the Super Admin role ID dynamically
         $superAdminRoleId = DB::table('roles')->where('name', 'superadmin')->value('id');
 
         if (!$superAdminRoleId) {
@@ -20,11 +19,9 @@ class SuperAdminSeeder extends Seeder
             return;
         }
 
-        // 🔹 Read from .env with fallbacks
         $email = env('SUPERADMIN_EMAIL', 'superadmin@dev.com');
         $password = env('SUPERADMIN_PASSWORD', 'password123');
 
-        // 🔹 Check if SuperAdmin exists
         $exists = User::where('email', $email)->first();
 
         if (!$exists) {
@@ -33,8 +30,8 @@ class SuperAdminSeeder extends Seeder
                 'name' => env('SUPERADMIN_NAME', 'System SuperAdmin'),
                 'email' => $email,
                 'email_verified_at' => Carbon::now(),
-                'password' => Hash::make($password),
-                'phone' => env('SUPERADMIN_PHONE', '09946855004'),
+                'password' => $password,
+                'phone' => env('SUPERADMIN_PHONE', '09946855004'), // Will be encrypted by model
                 'status' => 'active',
                 'created_by' => null,
             ]);

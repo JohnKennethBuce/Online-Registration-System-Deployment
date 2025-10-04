@@ -14,7 +14,7 @@ class Scan extends Model
         'ticket_printed_status_id'
     ];
 
-    protected $cast = [
+    protected $casts = [
         'scanned_time' => 'datetime',
         'created_at'  => 'datetime',
         'updated_at'  => 'datetime',

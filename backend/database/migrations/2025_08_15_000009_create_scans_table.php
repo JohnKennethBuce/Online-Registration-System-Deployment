@@ -17,7 +17,7 @@ return new class extends Migration
             // Registration being Scanned
             $table->foreignId('registration_id')->constrained('registrations')->cascadeOnDelete();
 
-            // Who scaned (nullable, e.g. Auto scan)
+            // Who scanned (nullable, e.g. Auto scan)
             $table->foreignId('scanned_by')->nullable()->constrained('users')->nullOnDelete();
 
             // When it was scanned
@@ -33,6 +33,7 @@ return new class extends Migration
             $table->index('scanned_time');
             $table->index(['registration_id', 'badge_printed_status_id']);
             $table->index(['registration_id', 'ticket_printed_status_id']);
+            $table->index('scanned_by');  // Added
         });
     }
 

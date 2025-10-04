@@ -11,22 +11,24 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Seed CORE data that should exist in ALL environments (production, staging, etc.).
-        // These seeders should be idempotent (using updateOrCreate) to run safely anytime.
+        // 1. Conditionally run truncate first (only for dev/local)
+        if (app()->isLocal() || app()->environment('development')) {
+            $this->call([
+                TruncateTablesSeeder::class,
+            ]);
+        }
+
+        // 2. Seed CORE data that should exist in ALL environments
         $this->call([
-            RoleSeeder::class,
+            RolesSeeder::class,
             PrintStatusesSeeder::class,
             SuperAdminSeeder::class,
             ServerModesSeeder::class,
         ]);
 
-        // 2. Conditionally run seeders that are ONLY for non-production environments.
+        // 3. Add test/demo data (only for dev/local)
         if (app()->isLocal() || app()->environment('development')) {
             $this->call([
-                // First, wipe the dev tables for a clean slate.
-                TruncateTablesSeeder::class,
-
-                // Then, add the test/demo data.
                 TestDataSeeder::class,
             ]);
         }
