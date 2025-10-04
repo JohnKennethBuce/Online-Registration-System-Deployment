@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 save all our data to your internal storage and update it when we updated it okay? 
 
 C:\Xamp-Jap\htdocs\Online_Registration_System\backend\app\Http\Controllers  
@@ -1669,3 +1670,6 @@ return new class extends Migration
 save data first as I command no Configurations needed, Just save all the data until I say 'develop' 
 
 
+=======
+
+>>>>>>> c391bde9f178b245e51fb99a69fab96cb9536eeb
