@@ -11,7 +11,8 @@ import Unauthorized from "./pages/Unauthorized";
 import DashboardPage from "./pages/DashboardPage";
 import Registrations from "./pages/Registrations";
 import RegistrationForm from "./pages/RegistrationForm";
-import ServerModeManager from "./pages/ServerModeManager"; // <-- NEW IMPORT
+import ServerModeManager from "./pages/ServerModeManager"; 
+import UserManagementPage from "./pages/UserManagementPage";
 
 // 🔹 NavBar Component
 function NavBar() {
@@ -36,6 +37,8 @@ function NavBar() {
             <>
               {" | "}
               <Link to="/server-mode">Server Mode</Link>
+              {" | "}
+              <Link to="/user-management">User Management</Link>
             </>
           )}
 
@@ -87,6 +90,15 @@ function App() {
             element={
               <ProtectedRoute roles={["superadmin"]}>
                 <SuperadminPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/user-management"
+            element={
+              <ProtectedRoute roles={["superadmin"]}>
+                <UserManagementPage />
               </ProtectedRoute>
             }
           />

@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ServerModeController;
 use App\Http\Controllers\BadgeController;
+use App\Http\Controllers\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,6 +51,10 @@ use App\Http\Controllers\BadgeController;
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/me', fn (Request $request) => $request->user()->load('role'));
 
+    // --- User Management Routes (Superadmin Only) ---
+    Route::apiResource('/users', UserController::class)
+         ->middleware('can:superadmin-only');
+         
     // --- Server Mode Management Routes ---
     // Accessible only to authenticated users, with specific admin restrictions.
     Route::prefix('server-mode')->name('server-mode.')->group(function () {
