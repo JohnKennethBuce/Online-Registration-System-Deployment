@@ -41,9 +41,9 @@ class UserController extends Controller
                 $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => $validated['password'], // Hashing handled by model
+            'password' => $validated['password'], 
             'role_id' => $adminRole->id,
-            'created_by' => Auth::id(), // ✅ cleaner & consistent
+            'created_by' => Auth::id(), 
         ]);
 
         return response()->json($user, 201);

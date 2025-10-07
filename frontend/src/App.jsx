@@ -16,40 +16,40 @@ import UserManagementPage from "./pages/UserManagementPage";
 
 // 🔹 NavBar Component
 function NavBar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
-    <nav style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>
-      <Link to="/">Home</Link> |{" "}
-      {!user && <Link to="/login">Login</Link>}
+    <nav style={{ padding: "10px", borderBottom: "1px solid #ccc", display: "flex", alignItems: "center" }}>
+      <Link to="/">Home</Link>
+      {!user && <>&nbsp;|&nbsp;<Link to="/login">Login</Link></>}
 
       {user && (
         <>
-          {" | "}
-          <Link to="/dashboard">Dashboard</Link>
-          {" | "}
-          <Link to="/admin">Admin</Link>
-          {" | "}
-          <Link to="/superadmin">Superadmin</Link>
+          &nbsp;|&nbsp;<Link to="/dashboard">Dashboard</Link>
+          &nbsp;|&nbsp;<Link to="/admin">Admin</Link>
+          &nbsp;|&nbsp;<Link to="/superadmin">Superadmin</Link>
 
-          {/* NEW: Link for Server Mode, only for superadmin */}
           {user.role?.name === "superadmin" && (
             <>
-              {" | "}
-              <Link to="/server-mode">Server Mode</Link>
-              {" | "}
-              <Link to="/user-management">User Management</Link>
+              &nbsp;|&nbsp;<Link to="/server-mode">Server Mode</Link>
+              &nbsp;|&nbsp;<Link to="/user-management">User Management</Link>
             </>
           )}
 
           {["admin", "superadmin"].includes(user.role?.name) && (
             <>
-              {" | "}
-              <Link to="/registrations">Registrations</Link>
-              {" | "}
-              <Link to="/register-new">New Registration</Link>
+              &nbsp;|&nbsp;<Link to="/registrations">Registrations</Link>
+              &nbsp;|&nbsp;<Link to="/register-new">New Registration</Link>
             </>
           )}
+
+          {/* This div is now inside the main user block and will be pushed to the right */}
+          <div style={{ marginLeft: "auto" }}>
+            <span>Welcome, {user.name}!</span>
+            <button onClick={logout} style={{ marginLeft: '15px' }}>
+              Logout
+            </button>
+          </div>
         </>
       )}
     </nav>
@@ -94,21 +94,22 @@ function App() {
             }
           />
 
-          <Route
-            path="/user-management"
-            element={
-              <ProtectedRoute roles={["superadmin"]}>
-                <UserManagementPage />
-              </ProtectedRoute>
-            }
-          />
 
-          {/* NEW: Protected route for the Server Mode page */}
           <Route
             path="/server-mode"
             element={
               <ProtectedRoute roles={["superadmin"]}>
                 <ServerModeManager />
+              </ProtectedRoute>
+            }
+          />
+
+          
+          <Route
+            path="/user-management"
+            element={
+              <ProtectedRoute roles={["superadmin"]}>
+                <UserManagementPage />
               </ProtectedRoute>
             }
           />

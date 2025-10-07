@@ -8,6 +8,7 @@ use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ServerModeController;
 use App\Http\Controllers\BadgeController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -54,6 +55,10 @@ use App\Http\Controllers\UserController;
     // --- User Management Routes (Superadmin Only) ---
     Route::apiResource('/users', UserController::class)
          ->middleware('can:superadmin-only');
+
+     // --- Settings Routes (Superadmin Only) ---
+    Route::get('/settings', [SettingController::class, 'index'])->middleware('can:superadmin-only');
+    Route::post('/settings', [SettingController::class, 'update'])->middleware('can:superadmin-only');
          
     // --- Server Mode Management Routes ---
     // Accessible only to authenticated users, with specific admin restrictions.

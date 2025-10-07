@@ -10,9 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use chillerlan\QRCode\QRCode;
-use chillerlan\QRCode\QROptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Crypt;
 use App\Jobs\GenerateQrCode;
@@ -77,12 +74,13 @@ class RegistrationController extends Controller
             // Create Registration first
             $ticketNumber = 'TICKET-' . strtoupper(Str::random(12));
             $registration = Registration::create([
-                'first_name' => Crypt::encryptString($validated['first_name']),
-                'last_name' => Crypt::encryptString($validated['last_name']),
-                'email' => Crypt::encryptString($validated['email']),
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'],
                 'email_hash' => $emailHash,
-                'phone' => $validated['phone'] ? Crypt::encryptString($validated['phone']) : null,
-                'address' => $validated['address'] ? Crypt::encryptString($validated['address']) : null,
+                'phone' => $validated['phone'],
+                'address' => $validated['address'],
+                'company_name' => $validated['company_name'],
                 'registration_type' => $validated['registration_type'],
                 'server_mode' => $serverMode->mode,
                 'badge_printed_status_id' => $badgeNotPrinted->id,
