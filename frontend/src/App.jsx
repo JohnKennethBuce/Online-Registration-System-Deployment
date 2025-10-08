@@ -13,6 +13,7 @@ import Registrations from "./pages/Registrations";
 import RegistrationForm from "./pages/RegistrationForm";
 import ServerModeManager from "./pages/ServerModeManager"; 
 import UserManagementPage from "./pages/UserManagementPage";
+import SettingsPage from "./pages/SettingsPage";
 
 // 🔹 NavBar Component
 function NavBar() {
@@ -33,13 +34,14 @@ function NavBar() {
             <>
               &nbsp;|&nbsp;<Link to="/server-mode">Server Mode</Link>
               &nbsp;|&nbsp;<Link to="/user-management">User Management</Link>
+              &nbsp;|&nbsp;<Link to="/settings">Badge Settings</Link>
             </>
           )}
 
           {["admin", "superadmin"].includes(user.role?.name) && (
             <>
               &nbsp;|&nbsp;<Link to="/registrations">Registrations</Link>
-              &nbsp;|&nbsp;<Link to="/register-new">New Registration</Link>
+              &nbsp;|&nbsp;<Link to="/register-new">New Registration</Link> 
             </>
           )}
 
@@ -110,6 +112,15 @@ function App() {
             element={
               <ProtectedRoute roles={["superadmin"]}>
                 <UserManagementPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute roles={["superadmin"]}>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />

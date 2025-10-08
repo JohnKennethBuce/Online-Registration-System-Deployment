@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Setting;
 
 
 class DashboardController extends Controller
@@ -214,7 +215,7 @@ class DashboardController extends Controller
     /**
      * Upload logos for badge/ticket (Super Admin only).
      */
-    public function uploadLogo(Request $request): JsonResponse
+     public function uploadLogo(Request $request): JsonResponse
     {
         try {
             if (Auth::user()->role->name !== 'superadmin') {
@@ -228,6 +229,8 @@ class DashboardController extends Controller
 
             $logoType = $request->input('logo_type');
             $file = $request->file('logo_file');
+            
+            // This is the relative path we will store in the database
             $fileName = 'logos/' . time() . '_' . $logoType . '.' . $file->getClientOriginalExtension();
 
             if (!Storage::disk('public')->exists('logos')) {
@@ -235,10 +238,28 @@ class DashboardController extends Controller
             }
             Storage::disk('public')->put($fileName, file_get_contents($file));
 
-            Log::info('Logo uploaded', ['type' => $logoType, 'path' => '/storage/' . $fileName, 'user_id' => Auth::id()]);
+            // --- NEW LOGIC TO UPDATE THE DATABASE ---
+            $settingKeyMap = [
+                'event'        => 'main_logo_path',
+                'organizer'    => 'organizer_logo_path',
+                'manager'      => 'manager_logo_path',
+                'registration' => 'registration_logo_path',
+            ];
+
+            if (array_key_exists($logoType, $settingKeyMap)) {
+                $settingKey = $settingKeyMap[$logoType];
+                Setting::updateOrCreate(
+                    ['key' => $settingKey],
+                    ['value' => $fileName]
+                );
+            }
+            // --- END NEW LOGIC ---
+
+            Log::info('Logo uploaded and setting updated', ['type' => $logoType, 'path' => $fileName, 'user_id' => Auth::id()]);
+            
             return response()->json([
                 'message' => 'Logo uploaded successfully',
-                'path' => '/storage/' . $fileName,
+                'path' => $fileName, // Return the relative path
             ]);
         } catch (\Exception $e) {
             Log::error('Logo upload error: ' . $e->getMessage());

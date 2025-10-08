@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             PrintStatusesSeeder::class,
             SuperAdminSeeder::class,
             ServerModesSeeder::class,
+            SettingsSeeder::class,
         ]);
 
         // 3. Add test/demo data (only for dev/local)
