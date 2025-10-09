@@ -5,7 +5,7 @@ namespace App\Providers;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\User;
-use Illuminate\Support\Facades\Log;
+use App\Enums\Permission; // <-- 1. Import our new Permission Enum
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -25,18 +25,22 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        Log::debug('✅ AuthServiceProvider booted successfully');
-
-        // 🔹 Superadmin only
-        Gate::define('superadmin-only', function (User $user) {
-            Log::debug('Checking superadmin-only gate', ['user_id' => $user->id, 'role_id' => $user->role_id]);
-            return $user->role_id === 1;
+        // 2. This Gate runs before all others. If the user's email matches the
+        // one in the .env file, they are the "Root" Super Admin and can do anything.
+        Gate::before(function (User $user, string $ability) {
+            if ($user->email === env('SUPERADMIN_EMAIL')) {
+                return true;
+            }
         });
 
-        // 🔹 Admin or Superadmin
-        Gate::define('admin-or-superadmin', function (User $user) {
-            Log::debug('Checking admin-or-superadmin gate', ['user_id' => $user->id, 'role_id' => $user->role_id]);
-            return in_array($user->role_id, [1, 2], true);
-        });
+        // 3. This loop dynamically registers a gate for every single permission
+        // we defined in our Permission Enum.
+        foreach (Permission::cases() as $permission) {
+            Gate::define($permission->value, function (User $user) use ($permission) {
+                // The check is simple: does the user's role's permission array
+                // contain the permission being checked?
+                return in_array($permission->value, $user->role->permissions ?? []);
+            });
+        }
     }
 }

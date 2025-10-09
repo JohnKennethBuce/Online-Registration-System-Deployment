@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Crypt;
 use App\Jobs\GenerateQrCode;
+use Illuminate\Validation\Rule;
 
 class RegistrationController extends Controller
 {
@@ -106,7 +107,7 @@ class RegistrationController extends Controller
             ], 201);
         }
         
-            public function show($ticketNumber): JsonResponse
+        public function show($ticketNumber): JsonResponse
             {
                 $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
                 return response()->json([
@@ -115,6 +116,38 @@ class RegistrationController extends Controller
                 ]);
             }
 
+        public function update(Request $request, Registration $registration)
+            {
+                $validated = $request->validate([
+                    'first_name' => 'required|string|max:255',
+                    'last_name' => 'required|string|max:255',
+                    'email' => ['required', 'email', 'max:255', Rule::unique('registrations')->ignore($registration->id)],
+                    'phone' => 'nullable|string|max:20',
+                    'address' => 'nullable|string|max:255',
+                    'company_name' => 'nullable|string|max:255',
+                    'registration_type' => 'required|in:onsite,online,pre-registered',
+                ]);
+                
+                // Update the email_hash if the email has changed
+                if ($registration->email !== $validated['email']) {
+                    $validated['email_hash'] = hash('sha256', strtolower(trim($validated['email'])));
+                }
+                
+                // The model's accessors/mutators will handle encryption automatically
+                $registration->update($validated);
+                
+                return response()->json($registration->fresh());
+            }
+
+        /**
+         * Delete a registration.
+         */
+        public function destroy(Registration $registration)
+            {
+                $registration->delete();
+            
+                return response()->json(null, 204); // 204 No Content success response
+            }
         public function scan(Request $request): JsonResponse
             {
                 $validated = $request->validate([

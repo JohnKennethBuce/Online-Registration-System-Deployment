@@ -3,8 +3,10 @@ import api from "../api/axios";
 import jsQR from "jsqr";
 import Modal from "../components/Modal";
 import EditRegistrationForm from "../components/EditRegistrationForm";
+import { useAuth } from "../context/AuthContext";
 
 export default function Registrations() {
+    const { user } = useAuth();
     const [registrations, setRegistrations] = useState([]);
     const [pagination, setPagination] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -42,29 +44,50 @@ export default function Registrations() {
     };
 
     const handleUpdateSave = async (updatedReg) => {
-        try {
-            await api.put(`/registrations/${updatedReg.id}`, updatedReg);
-            setIsModalOpen(false);
-            setEditingRegistration(null);
-            // Refresh the current page of data
-            fetchRegistrations(`/registrations?page=${pagination.meta.current_page}`);
-        } catch (error) {
-            alert("Failed to update registration.");
-            console.error(error.response?.data);
-        }
-    };
+    try {
+        await api.put(`/registrations/${updatedReg.id}`, updatedReg);
+        setIsModalOpen(false);
+        setEditingRegistration(null);
+        
+        // --- MORE ROBUST REFRESH LOGIC ---
+        const currentPage = pagination?.meta?.current_page;
+        
+        // Safely refresh the current page, or default to the first page if pagination data is missing
+        fetchRegistrations(currentPage ? `/registrations?page=${currentPage}` : '/registrations');
+
+    } catch (error) {
+        alert("Failed to update registration. See console for details.");
+        console.error("Update failed:", error.response || error);
+    }
+};
 
     const handleDelete = async (regId) => {
-        if (window.confirm("Are you sure you want to delete this registration permanently?")) {
-            try {
-                await api.delete(`/registrations/${regId}`);
-                // Refresh the current page of data
-                fetchRegistrations(`/registrations?page=${pagination.meta.current_page}`);
-            } catch (error) {
-                alert("Failed to delete registration.");
+    if (window.confirm("Are you sure you want to delete this registration permanently?")) {
+        try {
+            const response = await api.delete(`/registrations/${regId}`);
+            
+            if (response.status === 204) {
+                alert("Registration deleted successfully.");
+                
+                // --- MORE ROBUST REFRESH LOGIC ---
+                const currentPage = pagination?.meta?.current_page;
+                const prevPageLink = pagination?.links?.prev;
+
+                // Check if we just deleted the last item on a page (and it's not the first page)
+                if (registrations.length === 1 && currentPage > 1) {
+                    // Safely go to the previous page
+                    fetchRegistrations(prevPageLink || `/registrations?page=${currentPage - 1}`);
+                } else {
+                    // Otherwise, refresh the current page, or default to page 1 if data is missing
+                    fetchRegistrations(currentPage ? `/registrations?page=${currentPage}` : '/registrations');
+                }
             }
+        } catch (error) {
+            alert("Failed to delete registration. See console for details.");
+            console.error("Delete failed:", error.response || error);
         }
-    };
+    }
+};
 
     // ... (Your existing scanning functions: startScanning, stopScanning, etc. can remain here)
 
@@ -105,12 +128,20 @@ export default function Registrations() {
                             <td>{reg.first_name} {reg.last_name}</td>
                             <td>{reg.company_name || 'N/A'}</td>
                             <td>{reg.ticket_number}</td>
-                            <td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
                                 <button onClick={() => window.open(`${backendUrl}/api/registrations/${reg.ticket_number}/badge`, '_blank')}>
                                     Print Badge
                                 </button>
-                                <button onClick={() => handleEditClick(reg)} style={{ margin: '0 5px' }}>Edit</button>
-                                <button onClick={() => handleDelete(reg.id)} style={{ color: 'red' }}>Delete</button>
+                                                
+                                {/* Only show Edit button if user has permission */}
+                                {user.role?.permissions?.includes('edit-registration') && (
+                                    <button onClick={() => handleEditClick(reg)} style={{ margin: '0 5px' }}>Edit</button>
+                                )}
+                            
+                                {/* Only show Delete button if user has permission */}
+                                {user.role?.permissions?.includes('delete-registration') && (
+                                    <button onClick={() => handleDelete(reg.id)} style={{ color: 'red' }}>Delete</button>
+                                )}
                             </td>
                         </tr>
                     ))}

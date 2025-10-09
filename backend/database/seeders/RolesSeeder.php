@@ -4,39 +4,42 @@ namespace Database\Seeders;
 
 use App\Models\Role;
 use Illuminate\Database\Seeder;
-use Carbon\Carbon;
+use App\Enums\Permission; // <-- Import our new Permission Enum
 
 class RolesSeeder extends Seeder
 {
     public function run(): void
     {
+        // The 'superadmin' role gets all permissions.
         Role::updateOrCreate(
             ['name' => 'superadmin'],
             [
                 'description' => 'Full System Control',
-                'permissions' => json_encode(['*']), // Explicitly JSON-encoded
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'permissions' => Permission::all(), // <-- Assigns all permissions from the Enum
             ]
         );
 
+        // The 'admin' role gets a specific, limited set of permissions.
         Role::updateOrCreate(
             ['name' => 'admin'],
             [
                 'description' => 'Event operations and Monitoring',
-                'permissions' => json_encode(['admin']), // Explicitly JSON-encoded
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'permissions' => [
+                    Permission::VIEW_DASHBOARD->value,
+                    Permission::VIEW_REGISTRATIONS->value,
+                    Permission::CREATE_REGISTRATION->value,
+                    Permission::EDIT_REGISTRATION->value,
+                    // Note: We are intentionally NOT giving them delete permissions by default.
+                ],
             ]
         );
 
+        // The 'user' role for attendees has no specific system permissions.
         Role::updateOrCreate(
             ['name' => 'user'],
             [
-                'description' => 'attendee / Registrant',
-                'permissions' => json_encode(['user']), // Explicitly JSON-encoded
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'description' => 'Attendee / Registrant',
+                'permissions' => [], // <-- Correctly an empty array
             ]
         );
     }

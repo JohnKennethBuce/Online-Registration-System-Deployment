@@ -31,7 +31,6 @@ class BadgeController extends Controller
         $pdf = Pdf::loadView('pdfs.badge', $data);
 
         // Set paper size based on your spec (9x6.5 cm) and stream to browser
-        return $pdf->setPaper([0, 0, 184.25, 255.12], 'landscape')
-                   ->stream('badge-' . $ticketNumber . '.pdf');
+        return $pdf->stream('badge-' . $ticketNumber . '.pdf');
     }
 }

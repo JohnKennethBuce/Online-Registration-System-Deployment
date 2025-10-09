@@ -31,12 +31,12 @@ class User extends Authenticatable
         'email',
         'phone',
         'password',
+        'role_id',
+        'created_by',
     ];
 
     protected $guarded = [
-        'role_id',
         'status',
-        'created_by',
     ];
 
     /**

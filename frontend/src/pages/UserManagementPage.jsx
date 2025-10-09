@@ -1,67 +1,93 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import Modal from "../components/Modal";
+import EditUserForm from "../components/EditUserForm";
+import AddUserForm from "../components/AddUserForm";
 
 export default function UserManagementPage() {
     const [users, setUsers] = useState([]);
+    const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const fetchUsers = async () => {
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState(null);
+
+    const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/users');
-            setUsers(res.data.data); // Using .data because the response is paginated
-        } catch (error) {
-            alert('Failed to fetch users.');
-            console.error(error);
+            const [usersRes, rolesRes] = await Promise.all([
+                api.get('/users'),
+                api.get('/roles'),
+            ]);
+            setUsers(usersRes.data.data);
+            setRoles(rolesRes.data);
+            setError(null);
+        } catch (err) {
+            setError('Failed to fetch page data.');
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchUsers();
+        fetchData();
     }, []);
     
-    const handleAddUser = async () => {
-        const name = prompt("Enter new admin's name:");
-        if (!name) return;
+    // --- Edit Handlers ---
+    const handleEditClick = (user) => {
+        setEditingUser(user);
+        setIsEditModalOpen(true);
+    };
 
-        const email = prompt("Enter new admin's email:");
-        if (!email) return;
-
-        const password = prompt("Enter new admin's password (min 8 chars):");
-        if (!password || password.length < 8) {
-            alert("Password must be at least 8 characters long.");
-            return;
-        }
-
+    const handleUpdateSave = async (updatedUser) => {
         try {
-            await api.post('/users', { name, email, password });
-            fetchUsers(); // Refresh the list after adding
-        } catch (error) {
-            const errorMsg = error.response?.data?.message || 'Failed to create user.';
-            alert(errorMsg);
-            console.error(error.response.data);
+            await api.put(`/users/${updatedUser.id}`, updatedUser);
+            setIsEditModalOpen(false);
+            fetchData();
+        } catch (err) {
+            alert('Failed to update user.');
+            console.error(err.response?.data);
         }
     };
 
+    // --- Add Handlers ---
+    const handleAddClick = () => {
+        setIsAddModalOpen(true);
+    };
+
+    const handleCreateSave = async (newUser) => {
+        try {
+            await api.post('/users', newUser);
+            setIsAddModalOpen(false);
+            fetchData();
+        } catch (err) {
+            alert('Failed to create user. Check console for details.');
+            console.error(err.response?.data);
+        }
+    };
+
+    // --- Delete Handler ---
     const handleDeleteUser = async (userId) => {
-        if (window.confirm("Are you sure you want to delete this admin? This action cannot be undone.")) {
+        if (window.confirm("Are you sure you want to delete this admin?")) {
             try {
                 await api.delete(`/users/${userId}`);
-                fetchUsers(); // Refresh the list after deleting
-            } catch (error) {
+                fetchData();
+            } catch (err) {
                 alert('Failed to delete user.');
             }
         }
     };
 
     if (loading) return <p>Loading users...</p>;
+    if (error) return <p style={{ color: "red" }}>{error}</p>;
 
     return (
         <div style={{ padding: "20px" }}>
             <h2>👥 User Management</h2>
-            <button onClick={handleAddUser} style={{ marginBottom: '20px' }}>Add New Admin</button>
+            <button onClick={handleAddClick} style={{ marginBottom: '20px' }}>Add New User</button>
+            
             <table border="1" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                     <tr>
@@ -78,12 +104,31 @@ export default function UserManagementPage() {
                             <td style={{ padding: '8px' }}>{user.name}</td>
                             <td style={{ padding: '8px' }}>{user.email}</td>
                             <td style={{ padding: '8px', textAlign: 'center' }}>
+                                <button onClick={() => handleEditClick(user)} style={{ marginRight: '5px' }}>Edit</button>
                                 <button onClick={() => handleDeleteUser(user.id)} style={{ color: 'red' }}>Delete</button>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+            
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Admin User">
+                {editingUser && (
+                    <EditUserForm
+                        user={editingUser}
+                        onSave={handleUpdateSave}
+                        onCancel={() => setIsEditModalOpen(false)}
+                    />
+                )}
+            </Modal>
+
+            <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add New User">
+                <AddUserForm
+                    roles={roles}
+                    onSave={handleCreateSave}
+                    onCancel={() => setIsAddModalOpen(false)}
+                />
+            </Modal>
         </div>
     );
 }

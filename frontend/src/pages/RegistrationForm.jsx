@@ -8,6 +8,7 @@ export default function RegistrationForm() {
     email: "",
     phone: "",
     address: "",
+    company_name: "", // <-- FIX: Added this line
     registration_type: "onsite", // default
   });
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,7 @@ export default function RegistrationForm() {
     try {
       const res = await api.post("/registrations", form);
       setSuccess(`✅ ${res.data.message}`);
+      // Reset form to its initial state
       setForm({
         first_name: "",
         last_name: "",
@@ -34,7 +36,7 @@ export default function RegistrationForm() {
         phone: "",
         address: "",
         company_name: "",
-        registration_type: "onsite", //default
+        registration_type: "onsite",
       });
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
@@ -84,7 +86,6 @@ export default function RegistrationForm() {
           value={form.address}
           onChange={handleChange}
         /><br/>
-
         <input
           name="company_name"
           placeholder="Company Name (optional)"

@@ -30,20 +30,19 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $adminRole = Role::where('name', 'admin')->firstOrFail();
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
+            'role_id' => 'required|integer|exists:roles,id', // <-- Add validation for role_id
         ]);
 
-                $user = User::create([
+        $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => $validated['password'], 
-            'role_id' => $adminRole->id,
-            'created_by' => Auth::id(), 
+            'password' => $validated['password'],
+            'role_id' => $validated['role_id'], // <-- Use the role_id from the request
+            'created_by' => Auth::id(),
         ]);
 
         return response()->json($user, 201);

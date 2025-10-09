@@ -14,6 +14,11 @@ import RegistrationForm from "./pages/RegistrationForm";
 import ServerModeManager from "./pages/ServerModeManager"; 
 import UserManagementPage from "./pages/UserManagementPage";
 import SettingsPage from "./pages/SettingsPage";
+import OnsiteRegistrationPage from './pages/OnsiteRegistrationPage';
+import OnlineRegistrationPage from './pages/OnlineRegistrationPage';
+import RoleManagementPage from './pages/RoleManagementPage';
+import DashboardLayout from "./pages/DashboardLayout";
+
 
 // 🔹 NavBar Component
 function NavBar() {
@@ -22,30 +27,10 @@ function NavBar() {
   return (
     <nav style={{ padding: "10px", borderBottom: "1px solid #ccc", display: "flex", alignItems: "center" }}>
       <Link to="/">Home</Link>
-      {!user && <>&nbsp;|&nbsp;<Link to="/login">Login</Link></>}
 
-      {user && (
+      {user ? (
         <>
           &nbsp;|&nbsp;<Link to="/dashboard">Dashboard</Link>
-          &nbsp;|&nbsp;<Link to="/admin">Admin</Link>
-          &nbsp;|&nbsp;<Link to="/superadmin">Superadmin</Link>
-
-          {user.role?.name === "superadmin" && (
-            <>
-              &nbsp;|&nbsp;<Link to="/server-mode">Server Mode</Link>
-              &nbsp;|&nbsp;<Link to="/user-management">User Management</Link>
-              &nbsp;|&nbsp;<Link to="/settings">Badge Settings</Link>
-            </>
-          )}
-
-          {["admin", "superadmin"].includes(user.role?.name) && (
-            <>
-              &nbsp;|&nbsp;<Link to="/registrations">Registrations</Link>
-              &nbsp;|&nbsp;<Link to="/register-new">New Registration</Link> 
-            </>
-          )}
-
-          {/* This div is now inside the main user block and will be pushed to the right */}
           <div style={{ marginLeft: "auto" }}>
             <span>Welcome, {user.name}!</span>
             <button onClick={logout} style={{ marginLeft: '15px' }}>
@@ -53,10 +38,13 @@ function NavBar() {
             </button>
           </div>
         </>
+      ) : (
+        <>&nbsp;|&nbsp;<Link to="/login">Login</Link></>
       )}
     </nav>
   );
 }
+
 
 function App() {
   return (
@@ -65,84 +53,37 @@ function App() {
         <NavBar />
 
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/onsite" element={<OnsiteRegistrationPage />} />
+          <Route path="/online" element={<OnlineRegistrationPage />} />
 
-          <Route
-            path="/dashboard"
+          {/* Protected Dashboard Routes are now nested */}
+          <Route 
+            path="/dashboard" 
             element={
               <ProtectedRoute roles={["admin", "superadmin"]}>
-                <DashboardPage />
+                <DashboardLayout />
               </ProtectedRoute>
             }
-          />
+          >
+            {/* The 'index' is the default page shown at /dashboard */}
+            <Route index element={<DashboardPage />} /> 
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute roles={["admin", "superadmin"]}>
-                <AdminPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* All other admin pages are now children of /dashboard */}
+            <Route path="registrations" element={<Registrations />} />
+            <Route path="register-new" element={<RegistrationForm />} />
+            <Route path="user-management" element={<UserManagementPage />} />
+            <Route path="role-management" element={<RoleManagementPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="server-mode" element={<ServerModeManager />} />
 
-          <Route
-            path="/superadmin"
-            element={
-              <ProtectedRoute roles={["superadmin"]}>
-                <SuperadminPage />
-              </ProtectedRoute>
-            }
-          />
-
-
-          <Route
-            path="/server-mode"
-            element={
-              <ProtectedRoute roles={["superadmin"]}>
-                <ServerModeManager />
-              </ProtectedRoute>
-            }
-          />
-
-          
-          <Route
-            path="/user-management"
-            element={
-              <ProtectedRoute roles={["superadmin"]}>
-                <UserManagementPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute roles={["superadmin"]}>
-                <SettingsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/registrations"
-            element={
-              <ProtectedRoute roles={["admin", "superadmin"]}>
-                <Registrations />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/register-new"
-            element={
-              <ProtectedRoute roles={["admin", "superadmin"]}>
-                <RegistrationForm />
-              </ProtectedRoute>
-            }
-          />
-
+            {/* The old /admin and /superadmin pages can be removed or kept as needed */}
+            <Route path="admin" element={<AdminPage />} />
+            <Route path="superadmin" element={<SuperadminPage />} />
+          </Route>
         </Routes>
       </Router>
     </AuthProvider>
