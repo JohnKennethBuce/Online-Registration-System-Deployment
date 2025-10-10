@@ -58,15 +58,26 @@ export default function UserManagementPage() {
     };
 
     const handleCreateSave = async (newUser) => {
-        try {
-            await api.post('/users', newUser);
-            setIsAddModalOpen(false);
-            fetchData();
-        } catch (err) {
-            alert('Failed to create user. Check console for details.');
-            console.error(err.response?.data);
-        }
-    };
+    try {
+        const res = await api.post('/users', newUser);
+
+        const { user, token } = res.data;
+
+        console.log('✅ New user created:', user);
+        console.log('🔑 Auto-generated token:', token);
+
+        // 🪄 Auto-login as the new user (optional but powerful)
+        console.log(`New ${user.role.name} token:`, token);
+
+        setIsAddModalOpen(false);
+        fetchData();
+
+        alert(`${user.name} created successfully and is now authenticated!`);
+    } catch (err) {
+        alert('Failed to create user. Check console for details.');
+        console.error(err.response?.data);
+    }
+};
 
     // --- Delete Handler ---
     const handleDeleteUser = async (userId) => {

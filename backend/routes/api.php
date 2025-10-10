@@ -19,44 +19,101 @@ use App\Http\Controllers\RoleController;
 
 // --- PUBLIC ROUTES ---
 Route::get('/test', fn () => response()->json(['message' => 'API is working!']));
-Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
-Route::get('/registrations/{ticketNumber}/badge', [BadgeController::class, 'show'])->name('registrations.badge');
-Route::post('/registrations', [RegistrationController::class, 'store'])
-     ->name('registrations.store')
-     ->middleware('throttle:10,1');
 
+// 🔐 AUTH - Public
+Route::prefix('auth')->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
+});
+
+// 🎫 Public badge printing
+Route::get('/registrations/{ticketNumber}/badge', [BadgeController::class, 'show'])
+    ->name('registrations.badge');
+
+// 📝 Public registration form (rate limited)
+Route::post('/registrations', [RegistrationController::class, 'store'])
+    ->name('registrations.store')
+    ->middleware('throttle:10,1');
 
 // --- PROTECTED ROUTES ---
 Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
-    
-    Route::post('/auth/logout', [AuthController::class, 'logout'])->name('logout');
-    Route::get('/me', fn (Request $request) => $request->user()->load('role'));
 
-    // --- User Management ---
-    Route::apiResource('/users', UserController::class)
-         ->middleware('can:manage-users');
+    /*
+    |--------------------------------------------------------------------------
+    | AUTH ROUTES
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('auth')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-    // --- Role & Permission Management ---
-    Route::prefix('roles')->middleware('can:manage-users')->group(function () {
+        // ✅ Used by React AuthContext → fetchUser()
+        Route::get('/me', fn (Request $request) => $request->user()->load('role'));
+
+        // Optional - debug only
+        Route::get('/check', function (Request $request) {
+            $user = $request->user()->load('role');
+            return response()->json([
+                'authenticated' => $user !== null,
+                'user' => $user,
+                'role' => $user?->role?->name,
+                'permissions' => json_decode($user?->role?->permissions ?? '[]'),
+            ]);
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index'])->middleware('can:view-users');
+        Route::post('/', [UserController::class, 'store'])->middleware('can:create-user');
+        Route::put('/{user}', [UserController::class, 'update'])->middleware('can:edit-user');
+        Route::delete('/{user}', [UserController::class, 'destroy'])->middleware('can:delete-user');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | ROLE & PERMISSION MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('roles')->middleware('can:manage-roles')->group(function () {
         Route::get('/', [RoleController::class, 'index']);
         Route::put('/{role}', [RoleController::class, 'update']);
     });
     Route::get('/permissions', [RoleController::class, 'getAllPermissions'])
-         ->middleware('can:manage-users');
+        ->middleware('can:manage-roles');
 
-    // --- Settings ---
-    Route::get('/settings', [SettingController::class, 'index'])->middleware('can:manage-settings');
-    Route::post('/settings', [SettingController::class, 'update'])->middleware('can:manage-settings');
-        
-    // --- Server Mode Management ---
-    Route::prefix('server-mode')->name('server-mode.')->group(function () {
-        Route::get('/', [ServerModeController::class, 'getCurrentMode'])->middleware('can:view-dashboard');
-        Route::post('/', [ServerModeController::class, 'setMode'])->middleware('can:manage-server-mode');
-        Route::get('/history', [ServerModeController::class, 'getHistory'])->middleware('can:manage-server-mode');
+    /*
+    |--------------------------------------------------------------------------
+    | SETTINGS
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('settings')->group(function () {
+        Route::get('/', [SettingController::class, 'index'])->middleware('can:view-settings');
+        Route::post('/', [SettingController::class, 'update'])->middleware('can:edit-settings');
     });
 
-    // --- Dashboard Routes ---
-    Route::prefix('dashboard')->middleware('can:view-dashboard')->name('dashboard.')->group(function () {
+    /*
+    |--------------------------------------------------------------------------
+    | SERVER MODE MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('server-mode')->group(function () {
+        Route::get('/', [ServerModeController::class, 'getCurrentMode'])
+            ->middleware('can:view-server-mode');
+        Route::post('/', [ServerModeController::class, 'setMode'])
+            ->middleware('can:edit-server-mode');
+        Route::get('/history', [ServerModeController::class, 'getHistory'])
+            ->middleware('can:edit-server-mode');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | DASHBOARD
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('dashboard')->middleware('can:view-dashboard')->group(function () {
         Route::get('/summary', [DashboardController::class, 'summary']);
         Route::get('/registrations', [DashboardController::class, 'registrationsBreakdown']);
         Route::get('/print-statuses', [DashboardController::class, 'printStatusBreakdown']);
@@ -67,18 +124,20 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/logos', [DashboardController::class, 'getLogos']);
     });
 
-    // --- Admin Registration Routes ---
-    Route::prefix('registrations')->name('registrations.')->middleware('can:view-dashboard')->group(function () {
-        Route::get('/', [RegistrationController::class, 'index']);
-        Route::get('/{registration:ticket_number}', [RegistrationController::class, 'show']);
-        Route::post('/{ticket_number}/scan', [RegistrationController::class, 'scan']);
-        Route::post('/{ticket_number}/print-badge', [RegistrationController::class, 'printBadge']);
-        Route::post('/{ticket_number}/print-ticket', [RegistrationController::class, 'printTicket']);
-        Route::post('/{ticket_number}/scan-and-print-badge', [RegistrationController::class, 'scanAndPrintBadge']);
-        Route::post('/{ticket_number}/scan-and-print-ticket', [RegistrationController::class, 'scanAndPrintTicket']);
-
-        // Actions requiring higher privileges
-        Route::put('/{registration}', [RegistrationController::class, 'update'])->middleware('can:edit-registration');
-        Route::delete('/{registration}', [RegistrationController::class, 'destroy'])->middleware('can:delete-registration');
+    /*
+    |--------------------------------------------------------------------------
+    | REGISTRATION MANAGEMENT (Admin)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('registrations')->group(function () {
+        Route::get('/', [RegistrationController::class, 'index'])->middleware('can:view-registrations');
+        Route::get('/{registration:ticket_number}', [RegistrationController::class, 'show'])
+            ->middleware('can:view-registrations');
+        Route::post('/{ticket_number}/scan', [RegistrationController::class, 'scan'])
+            ->middleware('can:view-registrations');
+        Route::put('/{registration}', [RegistrationController::class, 'update'])
+            ->middleware('can:edit-registration');
+        Route::delete('/{registration}', [RegistrationController::class, 'destroy'])
+            ->middleware('can:delete-registration');
     });
 });

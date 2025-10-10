@@ -1,9 +1,20 @@
 <?php
 
 namespace App\Enums;
+use Illuminate\Support\Facades\Gate;
 
 enum Permission: string
 {
+
+    public function boot(): void
+{
+    foreach (Permission::cases() as $permission) {
+        Gate::define($permission->value, function ($user) use ($permission) {
+            $rolePermissions = json_decode($user->role?->permissions ?? '[]');
+            return in_array($permission->value, $rolePermissions);
+        });
+    }
+}
     // Dashboard Permissions
     case VIEW_DASHBOARD = 'view-dashboard';
 
