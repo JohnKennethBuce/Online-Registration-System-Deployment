@@ -98,12 +98,19 @@ class RegistrationController extends Controller
                 'user_id' => Auth::id(),
                 'mode' => $serverMode->mode
             ]);
-
+            
+            $fresh = $registration->fresh();
+            
+            // Normalize path and build a web URL if available
+            $qrUrl = $fresh->qr_code_path
+                ? asset('storage/' . ltrim(str_replace('\\', '/', $fresh->qr_code_path), '/'))
+                : null;
+            
             return response()->json([
                 'message' => 'Registration successful. The QR code will be generated shortly.',
-                // We return the fresh registration object without the qr_url,
-                // as it will be created in the background.
-                'registration' => $registration->fresh(),
+                'registration' => array_merge($fresh->toArray(), [
+                    'qr_url' => $qrUrl,
+                ]),
             ], 201);
         }
         

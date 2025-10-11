@@ -34,7 +34,7 @@ export function AuthProvider({ children }) {
   const fetchUser = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await api.get("/me"); // headers auto-attached
+      const response = await api.get("/auth/me"); // headers auto-attached
       setUser(response.data);
       localStorage.setItem("user", JSON.stringify(response.data));
     } catch (err) {

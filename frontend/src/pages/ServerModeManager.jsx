@@ -58,6 +58,9 @@ export default function ServerModeManager() {
         <button onClick={() => handleSetMode("both")} disabled={isUpdating}>
           Activate Both
         </button>
+        <button onClick={() => handleSetMode("deactivate")} disabled={isUpdating}>
+          Deactivate All
+        </button>
       </div>
       <p style={{ marginTop: "10px", fontSize: "12px", color: "#666" }}>
         Last updated by: {currentMode?.activated_by?.name} on {new Date(currentMode?.created_at).toLocaleString()}

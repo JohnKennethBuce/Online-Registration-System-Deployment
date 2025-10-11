@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use App\Enums\Permission;
+use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
 {
@@ -25,7 +26,7 @@ class RoleController extends Controller
     {
         $validated = $request->validate([
             'permissions' => 'required|array',
-            'permissions.*' => 'string', // Ensure all items in the array are strings
+            'permissions.*' => ['string', Rule::in(Permission::all())],
         ]);
         
         // This is a safeguard. It prevents the 'root' superadmin from accidentally

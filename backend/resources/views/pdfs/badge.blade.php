@@ -75,7 +75,13 @@
         <table class="header-table">
             <tr>
                 <td class="header-logo-cell">
-                    <img src="{{ public_path('storage/' . ($settings['main_logo_path'] ?? '')) }}" alt="Logo" class="main-logo">
+                    @php
+                        $mainLogo = $settings['main_logo_path'] ?? null;
+                        $mainLogoUrl = $mainLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $mainLogo), '/')) : null;
+                    @endphp
+                    @if($mainLogoUrl)
+                        <img src="{{ $mainLogoUrl }}" alt="Logo" class="main-logo">
+                    @endif
                 </td>
                 <td class="header-text-cell">
                     <p class="location-text">
@@ -93,7 +99,10 @@
         </div>
 
         @if($showQr && $registration->qr_code_path)
-            <img src="{{ storage_path('app/public/' . $registration->qr_code_path) }}" alt="QR Code" class="qr-code">
+            @php
+                $qrPath = asset('storage/' . ltrim(str_replace('\\', '/', $registration->qr_code_path), '/'));
+            @endphp
+            <img src="{{ $qrPath }}" alt="QR Code" class="qr-code">
         @endif
         
         <div class="footer">
@@ -101,15 +110,33 @@
                 <tr>
                     <td class="footer-item">
                         <strong>Organized By:</strong><br>
-                        <img src="{{ public_path('storage/' . ($settings['organizer_logo_path'] ?? '')) }}" alt="Organizer">
+                        @php
+                            $orgLogo = $settings['organizer_logo_path'] ?? null;
+                            $orgLogoUrl = $orgLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $orgLogo), '/')) : null;
+                        @endphp
+                        @if($orgLogoUrl)
+                            <img src="{{ $orgLogoUrl }}" alt="Organizer">
+                        @endif
                     </td>
                     <td class="footer-item">
                         <strong>Event Manager:</strong><br>
-                        <img src="{{ public_path('storage/' . ($settings['manager_logo_path'] ?? '')) }}" alt="Manager">
+                        @php
+                            $mgrLogo = $settings['manager_logo_path'] ?? null;
+                            $mgrLogoUrl = $mgrLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $mgrLogo), '/')) : null;
+                        @endphp
+                        @if($mgrLogoUrl)
+                            <img src="{{ $mgrLogoUrl }}" alt="Manager">
+                        @endif
                     </td>
                     <td class="footer-item">
                         <strong>Registration:</strong><br>
-                        <img src="{{ public_path('storage/' . ($settings['registration_logo_path'] ?? '')) }}" alt="Registration">
+                        @php
+                            $regLogo = $settings['registration_logo_path'] ?? null;
+                            $regLogoUrl = $regLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $regLogo), '/')) : null;
+                        @endphp
+                        @if($regLogoUrl)
+                            <img src="{{ $regLogoUrl }}" alt="Registration">
+                        @endif
                     </td>
                 </tr>
             </table>

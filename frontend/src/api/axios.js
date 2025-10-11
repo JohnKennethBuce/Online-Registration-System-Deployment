@@ -31,10 +31,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && [401, 403].includes(error.response.status)) {
-      console.warn("🔒 Unauthorized or Forbidden. Logging out...");
-      if (logoutHandler) logoutHandler(); // 👈 auto logout user
-    }
+    if (error.response?.status === 401) {
+    console.warn("🔒 Unauthorized. Logging out...");
+    if (logoutHandler) logoutHandler();}   
+
+    else if (error.response?.status === 403) {
+     console.warn("⛔ Forbidden. You don't have permission for this action.");}
+     // Let the caller handle it (e.g., show Unauthorized page or message)
     return Promise.reject(error);
   }
 );

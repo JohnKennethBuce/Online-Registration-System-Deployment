@@ -1,3 +1,7 @@
+
+10/10/2025 
+
+
 when I Logged in as the 2nd Registered superadmin, I created this using our usermanagement, but Logging in as Seeded 1st Superadmin is working just fine
 
 ServerModeManager.jsx:29
@@ -810,6 +814,902 @@ function App() {
             <Route path="role-management" element={<RoleManagementPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="server-mode" element={<ServerModeManager />} />
+    
+            {/* The old /admin and /superadmin pages can be removed or kept as needed */}
+            <Route path="admin" element={<AdminPage />} />
+            <Route path="superadmin" element={<SuperadminPage />} />
+          </Route>
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+}
+
+export default App; 
+
+
+
+
+
+
+-----------------------------------------------------------------------------------
+
+
+
+
+
+
+10/11/2025 
+
+I'm using laravel for backend, React For frontend  
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Enums\Permission.php 
+
+<?php
+
+namespace App\Enums;
+use Illuminate\Support\Facades\Gate;
+
+enum Permission: string
+{
+
+    public function boot(): void
+{
+    foreach (Permission::cases() as $permission) {
+        Gate::define($permission->value, function ($user) use ($permission) {
+            $rolePermissions = json_decode($user->role?->permissions ?? '[]');
+            return in_array($permission->value, $rolePermissions);
+        });
+    }
+}
+    // Dashboard Permissions
+    case VIEW_DASHBOARD = 'view-dashboard';
+
+    // Registration Permissions
+    case VIEW_REGISTRATIONS = 'view-registrations';
+    case CREATE_REGISTRATION = 'create-registration';
+    case EDIT_REGISTRATION = 'edit-registration';
+    case DELETE_REGISTRATION = 'delete-registration';
+
+    // User Management Permissions
+    case VIEW_USERS = 'view-users';
+    case CREATE_USER = 'create-user';
+    case EDIT_USER = 'edit-user';
+    case DELETE_USER = 'delete-user';
+
+    // Settings Permissions
+    case VIEW_SETTINGS = 'view-settings';
+    case EDIT_SETTINGS = 'edit-settings';
+
+    // Server Mode Permissions
+    case VIEW_SERVER_MODE = 'view-server-mode';
+    case EDIT_SERVER_MODE = 'edit-server-mode';
+
+    // Role Management Permissions
+    case MANAGE_ROLES = 'manage-roles';
+
+    /**
+     * Helper function to get all permission values as an array.
+     * Useful for seeding the database.
+     */
+    public static function all(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
+} 
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Http\Controllers\AuthController.php 
+
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class AuthController extends Controller
+{
+    /**
+     * Handle login and return a Sanctum token
+     */
+    public function login(Request $request)
+    {
+        $credentials = $request->validate([
+            'email'    => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        if (!Auth::attempt($credentials)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
+        }
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 🔹 Create a fresh token
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        return response()->json([
+            'user'  => $user->load('role'),
+            'token' => $token,
+        ]);
+    }
+
+    /**
+     * Handle logout and revoke the Sanctum token
+     */
+    public function logout(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user) {
+            // 🔹 If currentAccessToken exists, delete it
+            $token = $user->currentAccessToken();
+            if ($token) {
+                $token->delete();
+            }
+
+            return response()->json(['message' => 'Logged out successfully']);
+        }
+
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+} 
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Http\Controllers\RoleController.php  
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Role;
+use Illuminate\Http\Request;
+use App\Enums\Permission;
+
+class RoleController extends Controller
+{
+    /**
+     * List all editable roles.
+     */
+    public function index()
+    {
+        // We exclude the 'user' role as it has no system permissions to edit.
+        $roles = Role::where('name', '!=', 'user')->get();
+        return response()->json($roles);
+    }
+
+    /**
+     * Update the permissions for a specific role.
+     */
+    public function update(Request $request, Role $role)
+    {
+        $validated = $request->validate([
+            'permissions' => 'required|array',
+            'permissions.*' => 'string', // Ensure all items in the array are strings
+        ]);
+        
+        // This is a safeguard. It prevents the 'root' superadmin from accidentally
+        // removing all permissions from the 'superadmin' role itself.
+        if ($role->name === 'superadmin') {
+            $validated['permissions'] = Permission::all();
+        }
+
+        $role->update(['permissions' => $validated['permissions']]);
+
+        return response()->json($role);
+    }
+
+    /**
+     * Provide a list of all available permissions from the Enum.
+     */
+    public function getAllPermissions()
+    {
+        return response()->json(Permission::all());
+    }
+}
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Http\Controllers\UserController.php 
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\Role;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
+
+class UserController extends Controller
+{
+    /**
+     * List all users (excluding the superadmin role).
+     */
+    public function index()
+    {
+        $adminRole = Role::where('name', 'admin')->first();
+        if (!$adminRole) {
+            return response()->json(['users' => []]);
+        }
+        
+        $users = User::where('role_id', $adminRole->id)->latest()->paginate(25);
+        return response()->json($users);
+    }
+
+    /**
+     * Create a new admin user.
+     */
+    public function store(Request $request)
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|string|email|max:255|unique:users',
+        'password' => 'required|string|min:8',
+        'role_id' => 'required|integer|exists:roles,id',
+    ]);
+
+    $user = User::create([
+        'name' => $validated['name'],
+        'email' => $validated['email'],
+        'password' => $validated['password'],
+        'role_id' => $validated['role_id'],
+        'created_by' => Auth::id(),
+    ]);
+
+    // 🔹 Automatically generate a Sanctum token for the new user
+    $token = $user->createToken('auto-generated-token')->plainTextToken;
+
+    return response()->json([
+        'message' => 'User created successfully.',
+        'user' => $user->load('role'),
+        'token' => $token,
+    ], 201);
+}
+
+    /**
+     * Update a user's information.
+     */
+    public function update(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'password' => 'nullable|string|min:8', // Password is optional on update
+        ]);
+
+        $user->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ]);
+
+        if (!empty($validated['password'])) {
+            $user->password = $validated['password']; // Hashing is handled by the model
+            $user->save();
+        }
+
+        return response()->json($user);
+    }
+
+    /**
+     * Delete a user.
+     */
+    public function destroy(User $user)
+    {
+        // Add a safeguard to prevent deleting a superadmin
+        if ($user->role->name === 'superadmin') {
+            return response()->json(['error' => 'Cannot delete a superadmin.'], 403);
+        }
+
+        $user->delete();
+
+        return response()->json(null, 204);
+    }
+} 
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Models\Role.php 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Role extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'name', 'permissions', 'description',
+    ];
+
+    protected $casts = [
+        'permissions' => 'array',  // JSON to array
+    ];
+
+    // Relationship
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+} 
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Models\User.php 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Crypt;
+
+class User extends Authenticatable
+{
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * Always eager load these relationships.
+     *
+     * This ensures Auth::user() and Sanctum tokens
+     * always include the role without lazy-loading issues.
+     */
+    protected $with = ['role'];
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'name',
+        'email',
+        'phone',
+        'password',
+        'role_id',
+        'created_by',
+    ];
+
+    protected $guarded = [
+        'status',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    // Added phone encryption
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getPhoneAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+    // 🔹 Relationships
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    public function registrations()
+    {
+        return $this->hasMany(Registration::class, 'registered_by');
+    }
+
+    public function scans()
+    {
+        return $this->hasMany(Scan::class, 'scanned_by');
+    }
+
+    public function logs()
+    {
+        return $this->hasMany(Log::class);
+    }
+}
+
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Models\ServerMode.php 
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class ServerMode extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['mode', 'activated_by'];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    // relationship
+    public function activatedBy()
+    {
+        return $this->belongsTo(User::class, 'activated_by');
+    }
+} 
+
+C:\xampp\htdocs\Online-Registration-System\backend\database\seeders\RolesSeeder.php 
+
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Role;
+use Illuminate\Database\Seeder;
+use App\Enums\Permission; // <-- Import our new Permission Enum
+
+class RolesSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // The 'superadmin' role gets all permissions.
+        Role::updateOrCreate(
+            ['name' => 'superadmin'],
+            [
+                'description' => 'Full System Control',
+                'permissions' => Permission::all(), // <-- Assigns all permissions from the Enum
+            ]
+        );
+
+        // The 'admin' role gets a specific, limited set of permissions.
+        Role::updateOrCreate(
+            ['name' => 'admin'],
+            [
+                'description' => 'Event operations and Monitoring',
+                'permissions' => [
+                    Permission::VIEW_DASHBOARD->value,
+                    Permission::VIEW_REGISTRATIONS->value,
+                    Permission::CREATE_REGISTRATION->value,
+                    Permission::EDIT_REGISTRATION->value,
+                    // Note: We are intentionally NOT giving them delete permissions by default.
+                ],
+            ]
+        );
+
+        // The 'user' role for attendees has no specific system permissions.
+        Role::updateOrCreate(
+            ['name' => 'user'],
+            [
+                'description' => 'Attendee / Registrant',
+                'permissions' => [], // <-- Correctly an empty array
+            ]
+        );
+    }
+}
+
+C:\xampp\htdocs\Online-Registration-System\backend\database\seeders\ServerModesSeeder.php
+
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\ServerMode;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+
+class ServerModesSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        // Find the Super Admin user to attribute the action to.
+        $superAdmin = User::where('email', env('SUPERADMIN_EMAIL', 'superadmin@dev.com'))->first();
+
+        if (!$superAdmin) {
+            $this->command->warn("⚠️ SuperAdmin not found. Cannot seed the initial server mode.");
+            return;
+        }
+
+        // --- CORRECTED LOGIC ---
+        // We only want to seed ONE initial server mode. The 'firstOrCreate' method is
+        // perfect for this. It checks if any server mode exists. If not, it creates
+        // our specified default mode. If the table already has entries, it does nothing.
+        // This makes the seeder safe to run multiple times.
+
+        ServerMode::firstOrCreate(
+            [], // No conditions, we just want to check if the table is empty.
+            [
+                'mode' => 'onsite', // Set 'onsite' as the default starting mode.
+                'activated_by' => $superAdmin->id,
+            ]
+        );
+
+        $this->command->info("✅ Initial server mode ensured.");
+    }
+} 
+
+<?php
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\ServerModeController;
+use App\Http\Controllers\BadgeController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\SettingController;
+use App\Http\Controllers\RoleController;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
+
+// --- PUBLIC ROUTES ---
+Route::get('/test', fn () => response()->json(['message' => 'API is working!']));
+
+// 🔐 AUTH - Public
+Route::prefix('auth')->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
+});
+
+// 🎫 Public badge printing
+Route::get('/registrations/{ticketNumber}/badge', [BadgeController::class, 'show'])
+    ->name('registrations.badge');
+
+// 📝 Public registration form (rate limited)
+Route::post('/registrations', [RegistrationController::class, 'store'])
+    ->name('registrations.store')
+    ->middleware('throttle:10,1');
+
+// --- PROTECTED ROUTES ---
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUTH ROUTES
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('auth')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+        // ✅ Used by React AuthContext → fetchUser()
+        Route::get('/me', fn (Request $request) => $request->user()->load('role'));
+
+        // Optional - debug only
+        Route::get('/check', function (Request $request) {
+            $user = $request->user()->load('role');
+            return response()->json([
+                'authenticated' => $user !== null,
+                'user' => $user,
+                'role' => $user?->role?->name,
+                'permissions' => json_decode($user?->role?->permissions ?? '[]'),
+            ]);
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index'])->middleware('can:view-users');
+        Route::post('/', [UserController::class, 'store'])->middleware('can:create-user');
+        Route::put('/{user}', [UserController::class, 'update'])->middleware('can:edit-user');
+        Route::delete('/{user}', [UserController::class, 'destroy'])->middleware('can:delete-user');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | ROLE & PERMISSION MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('roles')->middleware('can:manage-roles')->group(function () {
+        Route::get('/', [RoleController::class, 'index']);
+        Route::put('/{role}', [RoleController::class, 'update']);
+    });
+    Route::get('/permissions', [RoleController::class, 'getAllPermissions'])
+        ->middleware('can:manage-roles');
+
+    /*
+    |--------------------------------------------------------------------------
+    | SETTINGS
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('settings')->group(function () {
+        Route::get('/', [SettingController::class, 'index'])->middleware('can:view-settings');
+        Route::post('/', [SettingController::class, 'update'])->middleware('can:edit-settings');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | SERVER MODE MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('server-mode')->group(function () {
+        Route::get('/', [ServerModeController::class, 'getCurrentMode'])
+            ->middleware('can:view-server-mode');
+        Route::post('/', [ServerModeController::class, 'setMode'])
+            ->middleware('can:edit-server-mode');
+        Route::get('/history', [ServerModeController::class, 'getHistory'])
+            ->middleware('can:edit-server-mode');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | DASHBOARD
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('dashboard')->middleware('can:view-dashboard')->group(function () {
+        Route::get('/summary', [DashboardController::class, 'summary']);
+        Route::get('/registrations', [DashboardController::class, 'registrationsBreakdown']);
+        Route::get('/print-statuses', [DashboardController::class, 'printStatusBreakdown']);
+        Route::get('/scans-per-user', [DashboardController::class, 'scansPerUser']);
+        Route::get('/logs', [DashboardController::class, 'logs']);
+        Route::get('/stats', [DashboardController::class, 'stats']);
+        Route::post('/upload-logo', [DashboardController::class, 'uploadLogo']);
+        Route::get('/logos', [DashboardController::class, 'getLogos']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | REGISTRATION MANAGEMENT (Admin)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('registrations')->group(function () {
+        Route::get('/', [RegistrationController::class, 'index'])->middleware('can:view-registrations');
+        Route::get('/{registration:ticket_number}', [RegistrationController::class, 'show'])
+            ->middleware('can:view-registrations');
+        Route::post('/{ticket_number}/scan', [RegistrationController::class, 'scan'])
+            ->middleware('can:view-registrations');
+        Route::put('/{registration}', [RegistrationController::class, 'update'])
+            ->middleware('can:edit-registration');
+        Route::delete('/{registration}', [RegistrationController::class, 'destroy'])
+            ->middleware('can:delete-registration');
+    });
+}); 
+
+C:\xampp\htdocs\Online-Registration-System\frontend\src\api\axios.js 
+
+// src/api/axios.js
+import axios from "axios";
+
+let logoutHandler = null; // 👈 will be set by AuthContext
+
+export const setLogoutHandler = (handler) => {
+  logoutHandler = handler;
+};
+
+// Create Axios instance
+const api = axios.create({
+  baseURL: "http://127.0.0.1:8000/api",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Request Interceptor - add Authorization automatically
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response Interceptor - handle 401/403 globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && [401, 403].includes(error.response.status)) {
+      console.warn("🔒 Unauthorized or Forbidden. Logging out...");
+      if (logoutHandler) logoutHandler(); // 👈 auto logout user
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api; 
+
+C:\xampp\htdocs\Online-Registration-System\frontend\src\context\AuthContext.jsx 
+
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import api, { setLogoutHandler } from "../api/axios"; 
+
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const [user, setUser] = useState(
+    localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : null
+  );
+  const [loading, setLoading] = useState(true);
+
+  // 🔹 Sync Axios global logout with our logout method
+  const logout = useCallback(async () => {
+    if (token) {
+      try {
+        await api.post("/auth/logout"); // no need for manual headers, Axios adds it
+      } catch (err) {
+        console.error("Logout error:", err);
+      }
+    }
+
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  }, [token]);
+
+  useEffect(() => {
+    setLogoutHandler(logout); // 👈 register logout handler
+  }, [logout]);
+
+  // 🔹 Fetch user profile
+  const fetchUser = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await api.get("/me"); // headers auto-attached
+      setUser(response.data);
+      localStorage.setItem("user", JSON.stringify(response.data));
+    } catch (err) {
+      console.error("Fetch user error:", err);
+      logout();
+    }
+  }, [token, logout]);
+
+  // 🔹 Restore user on mount
+  useEffect(() => {
+    const init = async () => {
+      if (token && !user) {
+        await fetchUser();
+      }
+      setLoading(false);
+    };
+    init();
+  }, [token, user, fetchUser]);
+
+  // 🔹 Login
+  const login = async (email, password) => {
+    try {
+      const { data } = await api.post("/auth/login", { email, password });
+      setToken(data.token);
+      setUser(data.user);
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      return true;
+    } catch (err) {
+      console.error("Login failed", err);
+      return false;
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ token, user, login, logout, fetchUser, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+} 
+
+
+C:\xampp\htdocs\Online-Registration-System\frontend\src\App.jsx 
+
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./ProtectedRoute";
+
+// Import all pages
+import Home from "./pages/Home";
+import LoginPage from "./pages/LoginPage";
+import AdminPage from "./pages/AdminPage";
+import SuperadminPage from "./pages/SuperadminPage";
+import Unauthorized from "./pages/Unauthorized";
+import DashboardPage from "./pages/DashboardPage";
+import Registrations from "./pages/Registrations";
+import RegistrationForm from "./pages/RegistrationForm";
+import ServerModeManager from "./pages/ServerModeManager"; 
+import UserManagementPage from "./pages/UserManagementPage";
+import SettingsPage from "./pages/SettingsPage";
+import OnsiteRegistrationPage from './pages/OnsiteRegistrationPage';
+import OnlineRegistrationPage from './pages/OnlineRegistrationPage';
+import RoleManagementPage from './pages/RoleManagementPage';
+import DashboardLayout from "./pages/DashboardLayout";
+
+
+// 🔹 NavBar Component
+function NavBar() {
+  const { user, logout } = useAuth();
+
+  return (
+    <nav style={{ padding: "10px", borderBottom: "1px solid #ccc", display: "flex", alignItems: "center" }}>
+      <Link to="/">Home</Link>
+
+      {user ? (
+        <>
+          &nbsp;|&nbsp;<Link to="/dashboard">Dashboard</Link>
+          <div style={{ marginLeft: "auto" }}>
+            <span>Welcome, {user.name}!</span>
+            <button onClick={logout} style={{ marginLeft: '15px' }}>
+              Logout
+            </button>
+          </div>
+        </>
+      ) : (
+        <>&nbsp;|&nbsp;<Link to="/login">Login</Link></>
+      )}
+    </nav>
+  );
+}
+
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <NavBar />
+
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/onsite" element={<OnsiteRegistrationPage />} />
+          <Route path="/online" element={<OnlineRegistrationPage />} />
+
+          {/* Protected Dashboard Routes are now nested */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute roles={["admin", "superadmin"]}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            {/* The 'index' is the default page shown at /dashboard */}
+            <Route index element={<DashboardPage />} /> 
+
+            {/* All other admin pages are now children of /dashboard */}
+            <Route path="registrations" element={<Registrations />} />
+            <Route path="register-new" element={<RegistrationForm />} />
+            <Route path="user-management" element={<UserManagementPage />} />
+            <Route path="role-management" element={<RoleManagementPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="server-mode" element={<ServerModeManager />} />
 
             {/* The old /admin and /superadmin pages can be removed or kept as needed */}
             <Route path="admin" element={<AdminPage />} />
@@ -821,4 +1721,39 @@ function App() {
   );
 }
 
-export default App;
+export default App; 
+
+
+C:\xampp\htdocs\Online-Registration-System\frontend\src\ProtectedRoute.jsx 
+
+import { Navigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import { useEffect, useState } from "react";
+
+export default function ProtectedRoute({ children, roles }) {
+  const { user, token, fetchUser } = useAuth();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const init = async () => {
+      if (token && !user) {
+        await fetchUser();
+      }
+      setLoading(false);
+    };
+    init();
+  }, [token, user, fetchUser]);
+
+  if (loading) return <div>Loading...</div>;
+
+  if (!token) return <Navigate to="/login" replace />;
+
+  if (roles && user && !roles.includes(user?.role?.name)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return children;
+}
+
+
+ 

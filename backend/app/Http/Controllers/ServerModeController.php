@@ -41,7 +41,7 @@ class ServerModeController extends Controller
         }
 
         $validated = $request->validate([
-            'mode' => 'required|string|in:onsite,online,both',
+            'mode' => 'required|string|in:onsite,online,both,deactivate',
         ]);
 
         // Create a new mode entry, which becomes the current active mode

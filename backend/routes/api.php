@@ -34,6 +34,10 @@ Route::post('/registrations', [RegistrationController::class, 'store'])
     ->name('registrations.store')
     ->middleware('throttle:10,1');
 
+// 🟢 Public server mode status (read-only)
+Route::get('/server-mode/status', [ServerModeController::class, 'getCurrentMode']);
+Route::get('/server-mode', [ServerModeController::class, 'getCurrentMode']); // alias
+
 // --- PROTECTED ROUTES ---
 Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
@@ -55,7 +59,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
                 'authenticated' => $user !== null,
                 'user' => $user,
                 'role' => $user?->role?->name,
-                'permissions' => json_decode($user?->role?->permissions ?? '[]'),
+                'permissions' => $user?->role?->permissions ?? [],
             ]);
         });
     });
@@ -100,8 +104,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('server-mode')->group(function () {
-        Route::get('/', [ServerModeController::class, 'getCurrentMode'])
-            ->middleware('can:view-server-mode');
+        // GET is public above; keep only mutating/history protected
         Route::post('/', [ServerModeController::class, 'setMode'])
             ->middleware('can:edit-server-mode');
         Route::get('/history', [ServerModeController::class, 'getHistory'])

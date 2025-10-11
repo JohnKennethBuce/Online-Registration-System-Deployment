@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
 
             // Mode set by Super Admin
-            $table->enum('mode', ['onsite', 'online', 'both'])->index();  // Added index
+            $table->enum('mode', ['onsite', 'online', 'both', 'deactivate'])->index();  // Added index
 
             // who activated this mode
             $table->foreignId('activated_by')

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 
 class Registration extends Model
 {
@@ -27,6 +28,22 @@ class Registration extends Model
         'created_at'   => 'datetime',  
         'updated_at'   => 'datetime',  
     ];
+
+    // Always append a web-safe QR URL to JSON
+    protected $appends = ['qr_url'];
+
+    // Accessor: returns a full HTTP URL to the QR image or null if not available
+    public function getQrUrlAttribute(): ?string
+    {
+        if (!$this->qr_code_path) {
+            return null;
+        }
+
+        // Normalize Windows slashes, generate '/storage/...' and convert to absolute URL
+        $path = str_replace('\\', '/', $this->qr_code_path);
+        $webPath = Storage::url($path); // e.g. '/storage/qr_codes/abc.png'
+        return url($webPath);           // e.g. 'http://127.0.0.1:8000/storage/qr_codes/abc.png'
+    }
 
     // Add these methods inside the Registration model class
     public function setCompanyNameAttribute($value)
