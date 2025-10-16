@@ -18,25 +18,16 @@ use Illuminate\Validation\Rule;
 class RegistrationController extends Controller
 {
     public function __construct()
-{
-    // Keep everything protected EXCEPT the public registration endpoint
-    $this->middleware('auth:sanctum')->except(['store']);
-}
+    {
+        $this->middleware('auth:sanctum')->except(['store']);
+    }
 
     public function index(Request $request): JsonResponse
-{
-    // Validate that the per_page is a reasonable number
-    $perPage = $request->validate([
-        'per_page' => 'integer|min:10|max:100'
-    ])['per_page'] ?? 50;
-
-    $registrations = Registration::with(['badgeStatus', 'ticketStatus'])
-        ->latest() // Always good to have a default order
-        ->paginate($perPage);
-
-    // No change to the return format, Laravel handles it automatically
-    return response()->json($registrations);
-}
+    {
+        $perPage = $request->validate(['per_page' => 'integer|min:10|max:100'])['per_page'] ?? 50;
+        $registrations = Registration::with(['badgeStatus', 'ticketStatus'])->latest()->paginate($perPage);
+        return response()->json($registrations);
+    }
 
     public function store(Request $request): JsonResponse
         {
@@ -172,6 +163,9 @@ class RegistrationController extends Controller
                     return response()->json(['error' => 'Scan not allowed in current mode'], 403);
                 }
             
+                // Superadmin can reprint unlimited
+                $isSuperAdmin = optional($request->user()->role)->name === 'superadmin';
+            
                 // --- Statuses ---
                 $badgeQueued     = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
                 $badgePrinting   = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
@@ -206,12 +200,16 @@ class RegistrationController extends Controller
                     ]);
                 }
             
-                // --- Badge flow with one-time reprint limit ---
+                // --- Badge flow with one-time reprint limit (superadmin bypass) ---
                 $badgeStatusId = $registration->badge_printed_status_id;
                 if ($badgeStatusId === $badgeReprinted->id) {
-                    return response()->json(['error' => 'Badge already reprinted once. Reprint limit reached.'], 409);
+                    if (!$isSuperAdmin) {
+                        return response()->json(['error' => 'Badge already reprinted once. Reprint limit reached.'], 409);
+                    }
+                    // superadmin: allow additional prints; keep status as "reprinted"
+                    // no change needed
                 } elseif ($badgeStatusId === $badgePrinted->id) {
-                    // allow exactly one reprint
+                    // printed → reprinted
                     $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
                 } else {
                     // not_printed (or other) → queue → printing → printed
@@ -223,8 +221,12 @@ class RegistrationController extends Controller
                 // --- Ticket flow (mirror; optional to enforce limit the same way) ---
                 $ticketStatusId = $registration->ticket_printed_status_id;
                 if ($ticketStatusId === $ticketReprinted->id) {
-                    // Uncomment to enforce one-time ticket reprint as well:
-                    // return response()->json(['error' => 'Ticket already reprinted once.'], 409);
+                    if ($isSuperAdmin) {
+                        // allow; keep as reprinted
+                    } else {
+                        // If you want the same strict limit for tickets, uncomment:
+                        // return response()->json(['error' => 'Ticket already reprinted once. Reprint limit reached.'], 409);
+                    }
                 } elseif ($ticketStatusId === $ticketPrinted->id) {
                     $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
                 } else {
@@ -236,7 +238,8 @@ class RegistrationController extends Controller
                 Log::info('Registration scanned; statuses updated', [
                     'ticket_number' => $ticket,
                     'user_id' => Auth::id(),
-                    'mode' => $currentMode
+                    'mode' => $currentMode,
+                    'superadmin_bypass' => $isSuperAdmin,
                 ]);
             
                 return response()->json([

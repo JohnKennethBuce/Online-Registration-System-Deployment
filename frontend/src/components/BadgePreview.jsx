@@ -4,14 +4,18 @@ export default function BadgePreview({ settings, registration }) {
   const backendUrl = api.defaults.baseURL.replace('/api', '');
   const placeholderQr = "https://www.qr-code-generator.com/wp-content/themes/qr/new_structure/markets/core_market/generator/dist/generator/assets/images/websiteQRCode_noFrame.png";
 
-  // Helper function to build the full image URL
   const getImageUrl = (path) => {
-    return path ? `${backendUrl}/storage/${path}` : '';
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    const normalized = String(path)
+      .replace(/\\/g, '/')
+      .replace(/^\/?storage\/?/i, '');
+    return `${backendUrl}/storage/${normalized}`;
   };
 
   return (
     <div style={{
-      width: '340px',
+      width: '340px', 
       height: '245px',
       border: '1px solid #ccc',
       padding: '15px',
@@ -20,15 +24,15 @@ export default function BadgePreview({ settings, registration }) {
       textAlign: 'center',
       fontFamily: 'sans-serif',
     }}>
-      {/* HEADER SECTION: Main Logo and Event Details side-by-side */}
+      {/* HEADER SECTION */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
         <img 
           src={getImageUrl(settings.main_logo_path)} 
           alt="Main Logo" 
           style={{ maxWidth: '80px', maxHeight: '40px' }}
-          key={settings.main_logo_path} // Key to force re-render on change
+          key={settings.main_logo_path}
         />
-        <div style={{ textAlign: 'left' }}> {/* Align text to the left */}
+        <div style={{ textAlign: 'left' }}>
           <p style={{ fontSize: '10px', margin: 0, lineHeight: 1.2 }}>
             {settings.event_location}<br/>
             {settings.event_datetime}
@@ -36,20 +40,22 @@ export default function BadgePreview({ settings, registration }) {
         </div>
       </div>
 
-      {/* Main Content (remains largely the same) */}
+      {/* MAIN CONTENT - 🔽 FIXED HERE 🔽 */}
       <p style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '0', marginBottom: '2px', whiteSpace: 'nowrap' }}>
-        {registration.firstName} {registration.lastName}
+        {registration.firstName || registration.first_name} {registration.lastName || registration.last_name}
       </p>
       <p style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '5px', marginBottom: '5px', minHeight: '16px' }}>
-        {registration.companyName || 'N/A'}
+        {registration.companyName || registration.company_name || 'N/A'}
       </p>
+      {/* 🔼 FIXED HERE 🔼 */}
+
       <p style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px' }}>
         {settings.event_name}
       </p>
 
       <img src={placeholderQr} alt="QR Code Preview" style={{ width: '70px', height: '70px', margin: '0 auto' }} />
 
-      {/* FOOTER SECTION: Logos (remains the same) */}
+      {/* FOOTER SECTION */}
       <div style={{ position: 'absolute', bottom: '10px', width: '100%', left: 0, padding: '0 15px', boxSizing: 'border-box', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '8px' }}>
         <div style={{ textAlign: 'left' }}>
           <strong>Organized By:</strong><br/>

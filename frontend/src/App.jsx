@@ -1,4 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+// C:\xampp\htdocs\Online-Registration-System\frontend\src\App.jsx
+
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -19,12 +21,17 @@ import OnlineRegistrationPage from './pages/OnlineRegistrationPage';
 import RoleManagementPage from './pages/RoleManagementPage';
 import DashboardLayout from "./pages/DashboardLayout";
 import ScannerPage from './pages/ScannerPage';
-
-
+import BadgePrintPage from './pages/BadgePrintPage';
 
 // 🔹 NavBar Component
 function NavBar() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+
+  // Hide NavBar on print-badge routes
+  if (location.pathname.startsWith('/print-badge')) {
+    return null;
+  }
 
   return (
     <nav style={{ padding: "10px", borderBottom: "1px solid #ccc", display: "flex", alignItems: "center" }}>
@@ -47,7 +54,6 @@ function NavBar() {
   );
 }
 
-
 function App() {
   return (
     <AuthProvider>
@@ -61,6 +67,7 @@ function App() {
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/onsite" element={<OnsiteRegistrationPage />} />
           <Route path="/online" element={<OnlineRegistrationPage />} />
+          <Route path="/print-badge/:ticket" element={<BadgePrintPage />} />
 
           {/* Protected Dashboard Routes are now nested */}
           <Route 
@@ -82,7 +89,6 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="server-mode" element={<ServerModeManager />} />
             <Route path="scanner" element={<ScannerPage />} />
-
 
             {/* The old /admin and /superadmin pages can be removed or kept as needed */}
             <Route path="admin" element={<AdminPage />} />

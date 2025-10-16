@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Models\Setting;
 
 
+
 class DashboardController extends Controller
 {
 
@@ -216,75 +217,95 @@ class DashboardController extends Controller
      * Upload logos for badge/ticket (Super Admin only).
      */
      public function uploadLogo(Request $request): JsonResponse
-    {
-        try {
-            if (Auth::user()->role->name !== 'superadmin') {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
-
-            $request->validate([
-                'logo_type' => 'required|in:event,organizer,manager,registration',
-                'logo_file' => 'required|image|max:2048', // Max 2MB
-            ]);
-
-            $logoType = $request->input('logo_type');
-            $file = $request->file('logo_file');
-            
-            // This is the relative path we will store in the database
-            $fileName = 'logos/' . time() . '_' . $logoType . '.' . $file->getClientOriginalExtension();
-
-            if (!Storage::disk('public')->exists('logos')) {
-                Storage::disk('public')->makeDirectory('logos');
-            }
-            Storage::disk('public')->put($fileName, file_get_contents($file));
-
-            // --- NEW LOGIC TO UPDATE THE DATABASE ---
-            $settingKeyMap = [
-                'event'        => 'main_logo_path',
-                'organizer'    => 'organizer_logo_path',
-                'manager'      => 'manager_logo_path',
-                'registration' => 'registration_logo_path',
-            ];
-
-            if (array_key_exists($logoType, $settingKeyMap)) {
-                $settingKey = $settingKeyMap[$logoType];
-                Setting::updateOrCreate(
-                    ['key' => $settingKey],
-                    ['value' => $fileName]
-                );
-            }
-            // --- END NEW LOGIC ---
-
-            Log::info('Logo uploaded and setting updated', ['type' => $logoType, 'path' => $fileName, 'user_id' => Auth::id()]);
-            
-            return response()->json([
-                'message' => 'Logo uploaded successfully',
-                'path' => $fileName, // Return the relative path
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Logo upload error: ' . $e->getMessage());
-            return response()->json([
-                'error'   => 'Failed to upload logo',
-                'message' => $e->getMessage()
-            ], 500);
+{
+    try {
+        if (Auth::user()->role->name !== 'superadmin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
+
+        $request->validate([
+            'logo_type' => 'required|in:event,organizer,manager,registration',
+            'logo_file' => 'required|image|max:2048', // Max 2MB
+        ]);
+
+        $logoType = $request->input('logo_type');
+        $file = $request->file('logo_file');
+
+        $settingKeyMap = [
+            'event'        => 'main_logo_path',
+            'organizer'    => 'organizer_logo_path',
+            'manager'      => 'manager_logo_path',
+            'registration' => 'registration_logo_path',
+        ];
+
+        $settingKey = $settingKeyMap[$logoType];
+
+        // 1) Get old path from settings
+        $existing = Setting::where('key', $settingKey)->first();
+        $oldPath = $existing?->value; // may be 'logos/foo.png' or 'storage/logos/foo.png'
+
+        // 2) Store new file on the 'public' disk → returns e.g. 'logos/new.png'
+        // Use store() so we always save a clean relative path (no 'storage/' prefix)
+        $newPath = $file->store('logos', 'public'); // e.g. 'logos/1700000000_event.png'
+
+        // 3) Delete old file if exists
+        if ($oldPath) {
+            // normalize old path to a relative path under 'public' disk
+            $oldRel = ltrim(str_replace('\\', '/', $oldPath), '/');
+            $oldRel = preg_replace('#^storage/#i', '', $oldRel); // strip leading 'storage/'
+            if ($oldRel && Storage::disk('public')->exists($oldRel)) {
+                Storage::disk('public')->delete($oldRel);
+            }
+        }
+
+        // 4) Save new path to settings (always relative)
+        Setting::updateOrCreate(
+            ['key' => $settingKey],
+            ['value' => $newPath]
+        );
+
+        Log::info('Logo uploaded and setting updated', [
+            'type' => $logoType,
+            'path' => $newPath,
+            'user_id' => Auth::id(),
+        ]);
+
+        return response()->json([
+            'message' => 'Logo uploaded successfully',
+            'path' => $newPath,                       // relative path for DB
+            'url'  => asset('storage/' . $newPath),   // absolute URL for convenience
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Logo upload error: ' . $e->getMessage());
+        return response()->json([
+            'error'   => 'Failed to upload logo',
+            'message' => $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * Retrieve available logos (for badge/ticket rendering).
      */
     public function getLogos(): JsonResponse
-    {
-        try {
-            $logos = Storage::disk('public')->files('logos');
-            $logoUrls = array_map(fn ($path) => '/storage/' . $path, $logos);
-            return response()->json(['logos' => $logoUrls]);
-        } catch (\Exception $e) {
-            Log::error('Get logos error: ' . $e->getMessage());
-            return response()->json([
-                'error'   => 'Failed to retrieve logos',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+{
+    try {
+        $files = Storage::disk('public')->files('logos');
+        $items = array_map(function ($path) {
+            return [
+                'path' => $path,                     // e.g., logos/foo.png
+                'url'  => asset('storage/' . $path) // absolute URL
+            ];
+        }, $files);
+
+        return response()->json(['logos' => $items]);
+    } catch (\Exception $e) {
+        Log::error('Get logos error: ' . $e->getMessage());
+        return response()->json([
+            'error'   => 'Failed to retrieve logos',
+            'message' => $e->getMessage()
+        ], 500);
     }
+}
+
 }

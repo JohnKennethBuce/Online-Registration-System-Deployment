@@ -1,146 +1,222 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta charset="utf-8">
+    <title>Badge - {{ $registration->ticket_number ?? 'Preview' }}</title>
+
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
+
     <script>
-        // If the 'print' URL parameter is present, open the browser's print dialog on load
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('print')) {
-            window.onload = () => window.print();
+        // Auto-print when ?print=true
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('print')) {
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    window.print();
+                    setTimeout(() => window.close(), 500);
+                }, 300);
+            });
         }
     </script>
+
     <style>
+        /* ✅ Paper size tuned for Koohii 1125z - 90x65mm (borderless) */
         @page {
-            /* This is the key: set the exact size and orientation. */
             size: 90mm 65mm;
             margin: 0;
         }
-        body { font-family: sans-serif; margin: 0; padding: 0; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            color: #1b1b18;
+            font-family: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            -webkit-print-color-adjust: exact;
+        }
+
         .badge {
             width: 100%;
             height: 100%;
-            padding: 15px;
+            padding: 12px 14px;
             box-sizing: border-box;
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
             text-align: center;
         }
-        .header-table { width: 100%; border-spacing: 0; margin-bottom: 10px; }
-        .header-logo-cell { width: 90px; vertical-align: middle; }
-        .header-text-cell { vertical-align: middle; text-align: left; }
-        .main-logo { max-width: 80px; max-height: 40px; }
-        .location-text { font-size: 10px; margin: 0; line-height: 1.2; }
-        .registrant-name {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0;
-            white-space: nowrap;
+
+        /* Header section */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 4px;
         }
-        .company-name {
-            font-size: 14px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 5px;
-            margin-top: 2px;
-            margin-bottom: 5px;
-            min-height: 16px;
+
+        .main-logo {
+            max-width: 70px;
+            max-height: 35px;
+            object-fit: contain;
         }
-        .event-day { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+
+        .event-info {
+            text-align: left;
+            font-size: 9px;
+            line-height: 1.3;
+        }
+
+        /* Main content */
         .main-content {
-            position: absolute;
-            top: 65px; /* Position content below header */
-            left: 15px;
-            width: calc(100% - 110px); /* Leave space for QR code */
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .name {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 3px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .company {
+            font-size: 13px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4px;
+            margin: 0 0 5px 0;
+            min-height: 15px;
+            width: 100%;
             text-align: center;
         }
-        .qr-code {
-            position: absolute;
-            top: 110px;
-            right: 15px;
+
+        .event-name {
+            font-size: 14px;
+            font-weight: 700;
+            margin: 2px 0 5px 0;
+        }
+
+        .qr {
             width: 70px;
             height: 70px;
+            object-fit: contain;
         }
+
+        /* Footer */
         .footer {
-            position: absolute;
-            bottom: 10px;
-            width: calc(100% - 30px);
-            left: 15px;
-            font-size: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            font-size: 7px;
+            line-height: 1.2;
         }
-        .footer-table { width: 100%; border-spacing: 0; }
-        .footer-item { text-align: left; vertical-align: bottom; }
-        .footer-item img { max-height: 15px; max-width: 60px; }
+
+        .footer-cell {
+            text-align: left;
+            width: 33%;
+        }
+
+        .footer-cell img {
+            max-height: 14px;
+            max-width: 55px;
+            object-fit: contain;
+        }
+
+        @media print {
+            html, body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
     </style>
 </head>
+
 <body>
-    <div class="badge">
-        <table class="header-table">
-            <tr>
-                <td class="header-logo-cell">
-                    @php
-                        $mainLogo = $settings['main_logo_path'] ?? null;
-                        $mainLogoUrl = $mainLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $mainLogo), '/')) : null;
-                    @endphp
-                    @if($mainLogoUrl)
-                        <img src="{{ $mainLogoUrl }}" alt="Logo" class="main-logo">
-                    @endif
-                </td>
-                <td class="header-text-cell">
-                    <p class="location-text">
-                        {!! nl2br(e($settings['event_location'] ?? 'Event Location')) !!}<br>
-                        {{ $settings['event_datetime'] ?? 'Event Date & Time' }}
-                    </p>
-                </td>
-            </tr>
-        </table>
+@php
+use Illuminate\Support\Facades\Storage;
 
-        <div class="main-content">
-            <p class="registrant-name">{{ $registration->first_name }} {{ $registration->last_name }}</p>
-            <p class="company-name">{{ $registration->company_name ?? 'N/A' }}</p>
-            <p class="event-day">{{ $settings['event_name'] ?? 'EVENT DAY' }}</p>
-        </div>
+$normalizePath = function ($path) {
+    if (!$path) return null;
+    if (preg_match('#^https?://#i', $path)) return $path;
 
-        @if($showQr && $registration->qr_code_path)
-            @php
-                $qrPath = asset('storage/' . ltrim(str_replace('\\', '/', $registration->qr_code_path), '/'));
-            @endphp
-            <img src="{{ $qrPath }}" alt="QR Code" class="qr-code">
+    $clean = ltrim(str_replace('\\', '/', $path), '/');
+    $clean = preg_replace('#^storage/#i', '', $clean);
+
+    if (file_exists(storage_path("app/public/{$clean}"))) {
+        return asset("storage/{$clean}");
+    }
+    if (file_exists(public_path("storage/{$clean}"))) {
+        return asset("storage/{$clean}");
+    }
+    return asset('storage/logos/default_logo.png');
+};
+
+$mainLogo = $normalizePath($settings['main_logo_path'] ?? null);
+$orgLogo  = $normalizePath($settings['organizer_logo_path'] ?? null);
+$mgrLogo  = $normalizePath($settings['manager_logo_path'] ?? null);
+$regLogo  = $normalizePath($settings['registration_logo_path'] ?? null);
+$qrUrl    = $registration->qr_code_path ? $normalizePath($registration->qr_code_path) : null;
+
+$eventName     = $settings['event_name'] ?? 'EVENT NAME';
+$eventLocation = $settings['event_location'] ?? 'Event Location';
+$eventDateTime = $settings['event_datetime'] ?? 'Event Date & Time';
+$first         = $registration->first_name ?? '';
+$last          = $registration->last_name ?? '';
+$company       = $registration->company_name ?? 'N/A';
+$showQr        = !empty($registration->qr_code_path);
+@endphp
+
+<div class="badge">
+    <!-- HEADER -->
+    <div class="header">
+        @if ($mainLogo)
+            <img src="{{ $mainLogo }}" alt="Main Logo" class="main-logo">
         @endif
-        
-        <div class="footer">
-            <table class="footer-table">
-                <tr>
-                    <td class="footer-item">
-                        <strong>Organized By:</strong><br>
-                        @php
-                            $orgLogo = $settings['organizer_logo_path'] ?? null;
-                            $orgLogoUrl = $orgLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $orgLogo), '/')) : null;
-                        @endphp
-                        @if($orgLogoUrl)
-                            <img src="{{ $orgLogoUrl }}" alt="Organizer">
-                        @endif
-                    </td>
-                    <td class="footer-item">
-                        <strong>Event Manager:</strong><br>
-                        @php
-                            $mgrLogo = $settings['manager_logo_path'] ?? null;
-                            $mgrLogoUrl = $mgrLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $mgrLogo), '/')) : null;
-                        @endphp
-                        @if($mgrLogoUrl)
-                            <img src="{{ $mgrLogoUrl }}" alt="Manager">
-                        @endif
-                    </td>
-                    <td class="footer-item">
-                        <strong>Registration:</strong><br>
-                        @php
-                            $regLogo = $settings['registration_logo_path'] ?? null;
-                            $regLogoUrl = $regLogo ? asset('storage/' . ltrim(str_replace('\\', '/', $regLogo), '/')) : null;
-                        @endphp
-                        @if($regLogoUrl)
-                            <img src="{{ $regLogoUrl }}" alt="Registration">
-                        @endif
-                    </td>
-                </tr>
-            </table>
+        <div class="event-info">
+            {!! nl2br(e($eventLocation)) !!}<br>
+            {{ $eventDateTime }}
         </div>
     </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <div class="name" title="{{ $first }} {{ $last }}">{{ $first }} {{ $last }}</div>
+        <div class="company" title="{{ $company }}">{{ $company ?: 'N/A' }}</div>
+        <div class="event-name">{{ $eventName }}</div>
+        @if ($showQr && $qrUrl)
+            <img src="{{ $qrUrl }}" alt="QR Code" class="qr">
+        @endif
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <div class="footer-cell">
+            <strong>Organized By:</strong><br>
+            @if ($orgLogo)
+                <img src="{{ $orgLogo }}" alt="Organizer Logo">
+            @endif
+        </div>
+        <div class="footer-cell">
+            <strong>Event Manager:</strong><br>
+            @if ($mgrLogo)
+                <img src="{{ $mgrLogo }}" alt="Manager Logo">
+            @endif
+        </div>
+        <div class="footer-cell">
+            <strong>Registration:</strong><br>
+            @if ($regLogo)
+                <img src="{{ $regLogo }}" alt="Registration Logo">
+            @endif
+        </div>
+    </div>
+</div>
 </body>
 </html>
