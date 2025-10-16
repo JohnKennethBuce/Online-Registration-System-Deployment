@@ -34,8 +34,8 @@ export default function ScannerPage() {
     // 1) Update statuses and log scan (printed / one-time reprinted)
     await api.post(`/registrations/${ticket}/scan`);
 
-    // 2) Navigate the opened tab to the public badge page (auto-print handled by your Blade)
-    const badgeUrl = `${backendBase}/registrations/${ticket}/badge?show_qr=false&print=true`;
+    // 2) Navigate the opened tab to the frontend badge print page
+    const badgeUrl = `/print-badge/${ticket}`;
     if (printWin) {
       printWin.location = badgeUrl;
       printWin.focus();
