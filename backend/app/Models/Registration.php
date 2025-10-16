@@ -15,18 +15,20 @@ class Registration extends Model
         'first_name', 'last_name', 'email', 'phone', 'address', 'company_name',
         'registration_type', 'server_mode', 'qr_code_path',
         'ticket_number', 'confirmed_at', 'email_hash',
+
+        // allow controller updates on these fields
+        'confirmed', 'confirmed_by', 'registered_by',
+        'badge_printed_status_id', 'ticket_printed_status_id',
     ];
 
-    protected $guarded = [
-        'badge_printed_status_id', 'ticket_printed_status_id',
-        'confirmed', 'confirmed_by', 'registered_by',
-    ];
+    // Remove guarded to allow mass-assignment of the fields above
+    // protected $guarded = [];
 
     protected $casts = [
         'confirmed'    => 'boolean',
         'confirmed_at' => 'datetime',
-        'created_at'   => 'datetime',  
-        'updated_at'   => 'datetime',  
+        'created_at'   => 'datetime',
+        'updated_at'   => 'datetime',
     ];
 
     // Always append a web-safe QR URL to JSON
@@ -39,13 +41,14 @@ class Registration extends Model
             return null;
         }
 
-        // Normalize Windows slashes, generate '/storage/...' and convert to absolute URL
-        $path = str_replace('\\', '/', $this->qr_code_path);
-        $webPath = Storage::url($path); // e.g. '/storage/qr_codes/abc.png'
-        return url($webPath);           // e.g. 'http://127.0.0.1:8000/storage/qr_codes/abc.png'
+    // Normalize slashes and build relative path
+    $relative = ltrim(str_replace('\\', '/', $this->qr_code_path), '/');
+
+    // Return proper absolute URL like http://127.0.0.1:8000/storage/qrcodes/TICKET-XYZ.png
+    return asset('storage/' . $relative);
     }
 
-    // Add these methods inside the Registration model class
+    // Company name encryption
     public function setCompanyNameAttribute($value)
     {
         $this->attributes['company_name'] = $value ? Crypt::encryptString($value) : null;

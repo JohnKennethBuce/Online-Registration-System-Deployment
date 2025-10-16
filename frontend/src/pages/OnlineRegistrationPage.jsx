@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api from '../api/axios';
 
 export default function OnlineRegistrationPage() {
@@ -24,6 +24,7 @@ export default function OnlineRegistrationPage() {
   const [qrUrl, setQrUrl] = useState('');
 
   const backendOrigin = api.defaults.baseURL.replace('/api', '');
+  const isMounted = useRef(true);
 
   const initialForm = {
     first_name: '',
@@ -35,6 +36,10 @@ export default function OnlineRegistrationPage() {
     registration_type: 'online',
   };
 
+  useEffect(() => {
+    return () => { isMounted.current = false; };
+  }, []);
+
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
   const preloadImage = (src) =>
     new Promise((resolve, reject) => {
@@ -43,6 +48,73 @@ export default function OnlineRegistrationPage() {
       img.onerror = reject;
       img.src = src;
     });
+
+  const buildQrUrl = (reg) => {
+  if (reg.qr_code_path) {
+    const normalized = reg.qr_code_path
+      .replace(/\\/g, '/')
+      .replace(/^\/?public\/?/i, '')
+      .replace(/^\/?storage\/?/i, '');
+    return `${backendOrigin}/storage/${normalized}?v=${Date.now()}`;
+  }
+
+  if (reg.ticket_number) {
+    const predicted = `qrcodes/${reg.ticket_number}.png`;
+    return `${backendOrigin}/storage/${predicted}?v=${Date.now()}`;
+  }
+
+  return null;
+};
+
+  const fetchLatestRegistration = async (ticketNumber) => {
+    try {
+      const { data } = await api.get(`/registrations/${ticketNumber}`);
+      return data.registration || data;
+    } catch {
+      return null;
+    }
+  };
+
+  // Poll for QR existence using image preload (no CORS issues)
+  const pollForQr = async (ticketNumber, baseReg) => {
+    const delays = [800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600]; // ~15s total
+    for (let i = 0; i < delays.length; i++) {
+      if (!isMounted.current) return false;
+
+      // Try with what we know (including predicted path)
+      let candidateUrl = buildQrUrl(baseReg);
+      if (candidateUrl) {
+        try {
+          await preloadImage(candidateUrl);
+          if (!isMounted.current) return false;
+          setQrUrl(candidateUrl);
+          return true;
+        } catch {
+          // not ready yet
+        }
+      }
+
+      // Try to get the latest registration from API (qr_code_path may now be set)
+      const latest = await fetchLatestRegistration(ticketNumber);
+      if (latest) {
+        candidateUrl = buildQrUrl(latest);
+        if (candidateUrl) {
+          try {
+            await preloadImage(candidateUrl);
+            if (!isMounted.current) return false;
+            setSuccessfulReg(latest);
+            setQrUrl(candidateUrl);
+            return true;
+          } catch {
+            // still not ready
+          }
+        }
+      }
+
+      await sleep(delays[i]);
+    }
+    return false;
+  };
 
   const getErrorMessage = (err) => {
     const resp = err.response;
@@ -84,24 +156,20 @@ export default function OnlineRegistrationPage() {
       const { data } = await api.post('/registrations', form);
       const reg = data.registration;
 
-      // Prefer backend-provided qr_url; fallback to building from qr_code_path if present
-      const normalizedPath = reg.qr_code_path ? reg.qr_code_path.replace(/\\/g, '/') : null;
-      const builtUrl = normalizedPath ? `${backendOrigin}/storage/${normalizedPath}` : null;
-      const url = reg.qr_url || (builtUrl ? `${builtUrl}?v=${Date.now()}` : '');
-
-      // Short "preparing" delay + preload QR if we have a URL already
       setPreparingQr(true);
-      if (url) {
+      await sleep(800); // tiny initial delay
+
+      // Try immediate URL via image preload; otherwise poll
+      let candidateUrl = buildQrUrl(reg);
+      if (candidateUrl) {
         try {
-          await Promise.all([sleep(1500), preloadImage(url)]);
-        } catch (_) {
-          // If preloading fails initially (file not ready), wait a bit more and proceed
-          await sleep(700);
+          await preloadImage(candidateUrl);
+          setQrUrl(candidateUrl);
+        } catch {
+          await pollForQr(reg.ticket_number, reg);
         }
-        setQrUrl(url);
       } else {
-        // If qr_url wasn't ready yet, still show preparing state briefly
-        await sleep(1500);
+        await pollForQr(reg.ticket_number, reg);
       }
 
       setSuccessfulReg(reg);
@@ -116,7 +184,7 @@ export default function OnlineRegistrationPage() {
 
   if (loading) return <h2 style={{ padding: '20px' }}>Loading...</h2>;
 
-  // Preparing screen (short delay before showing QR)
+  // Preparing screen
   if (preparingQr) {
     return (
       <div style={{ padding: '20px', textAlign: 'center', maxWidth: '500px', margin: 'auto' }}>
@@ -126,16 +194,13 @@ export default function OnlineRegistrationPage() {
     );
   }
 
-  // Success screen (show QR)
+  // Success screen
   if (successfulReg) {
     const badgePage = `${api.defaults.baseURL}/registrations/${successfulReg.ticket_number}/badge`;
 
-    const refreshQr = () => {
-      if (!successfulReg.qr_url && !successfulReg.qr_code_path) return;
-      const base = successfulReg.qr_url
-        ? successfulReg.qr_url
-        : `${backendOrigin}/storage/${successfulReg.qr_code_path.replace(/\\/g, '/')}`;
-      setQrUrl(`${base}?v=${Date.now()}`);
+    const refreshQr = async () => {
+      if (!successfulReg?.ticket_number) return;
+      await pollForQr(successfulReg.ticket_number, successfulReg);
     };
 
     return (
@@ -147,7 +212,7 @@ export default function OnlineRegistrationPage() {
           <img
             src={qrUrl}
             alt="Your Registration QR Code"
-            onError={() => setTimeout(refreshQr, 800)} // retry with cache-bust if file isn't ready yet
+            onError={() => setTimeout(refreshQr, 800)}
             style={{ border: '1px solid black', padding: '10px', maxWidth: '300px', width: '100%' }}
           />
         ) : (
@@ -171,11 +236,9 @@ export default function OnlineRegistrationPage() {
               <span style={{ margin: '0 6px' }}>|</span>
             </>
           )}
-          {/* Public badge page (HTML) as a fallback */}
           <a href={badgePage} target="_blank" rel="noreferrer">Open Badge Page</a>
         </div>
 
-        {/* Back to form for testing */}
         <button
           style={{ marginTop: 16 }}
           onClick={() => {
@@ -196,7 +259,6 @@ export default function OnlineRegistrationPage() {
     return <h2 style={{ padding: '20px' }}>Online registration is currently closed.</h2>;
   }
 
-  // Registration form
   return (
     <div style={{ padding: '20px', maxWidth: '500px', margin: 'auto' }}>
       <h1>Online Registration</h1>

@@ -33,6 +33,11 @@ function DashboardNav() {
       {user.role?.permissions?.includes('edit-server-mode') && (
         <Link to="/dashboard/server-mode" style={linkStyle}>Server Mode</Link>
       )}
+
+      {user.role?.permissions?.includes('scan-registration') && (
+      <Link to="/dashboard/scanner" style={linkStyle}>QR Scanner</Link>
+      )}
+      
     </nav>
   );
 }

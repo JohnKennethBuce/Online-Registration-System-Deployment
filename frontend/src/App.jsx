@@ -18,6 +18,8 @@ import OnsiteRegistrationPage from './pages/OnsiteRegistrationPage';
 import OnlineRegistrationPage from './pages/OnlineRegistrationPage';
 import RoleManagementPage from './pages/RoleManagementPage';
 import DashboardLayout from "./pages/DashboardLayout";
+import ScannerPage from './pages/ScannerPage';
+
 
 
 // 🔹 NavBar Component
@@ -79,6 +81,8 @@ function App() {
             <Route path="role-management" element={<RoleManagementPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="server-mode" element={<ServerModeManager />} />
+            <Route path="scanner" element={<ScannerPage />} />
+
 
             {/* The old /admin and /superadmin pages can be removed or kept as needed */}
             <Route path="admin" element={<AdminPage />} />

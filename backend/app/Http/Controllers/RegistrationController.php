@@ -18,9 +18,10 @@ use Illuminate\Validation\Rule;
 class RegistrationController extends Controller
 {
     public function __construct()
-    {
-        $this->middleware('auth:sanctum'); // Ensure authenticated user
-    }
+{
+    // Keep everything protected EXCEPT the public registration endpoint
+    $this->middleware('auth:sanctum')->except(['store']);
+}
 
     public function index(Request $request): JsonResponse
 {
@@ -91,7 +92,8 @@ class RegistrationController extends Controller
             ]);
 
             // ✅ Dispatch a job to handle QR code generation in the background
-            GenerateQrCode::dispatch($registration);
+           (new GenerateQrCode($registration))->handle();
+
 
             Log::info('Registration created and QR job dispatched', [
                 'ticket_number' => $ticketNumber,
@@ -155,13 +157,15 @@ class RegistrationController extends Controller
             
                 return response()->json(null, 204); // 204 No Content success response
             }
-        public function scan(Request $request): JsonResponse
+        public function scan(Request $request, ?string $ticket_number = null): JsonResponse
             {
-                $validated = $request->validate([
-                    'ticket_number' => 'required|string|exists:registrations,ticket_number',
-                ]);
+                // Accept from route param or request body
+                $ticket = $ticket_number ?: $request->input('ticket_number');
+                if (!$ticket) {
+                    return response()->json(['error' => 'ticket_number is required'], 422);
+                }
             
-                $registration = Registration::where('ticket_number', $validated['ticket_number'])->firstOrFail();
+                $registration = Registration::where('ticket_number', $ticket)->firstOrFail();
                 $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
             
                 if ($registration->server_mode !== $currentMode && $currentMode !== 'both') {
@@ -169,19 +173,18 @@ class RegistrationController extends Controller
                 }
             
                 // --- Statuses ---
-                $badgeQueued   = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
-                $badgePrinting = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
-                $badgePrinted  = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
-                $badgeReprinted= PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
-                $badgeFailed   = PrintStatus::where('type', 'badge')->where('name', 'failed')->first();
+                $badgeQueued     = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+                $badgePrinting   = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+                $badgePrinted    = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+                $badgeReprinted  = PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
             
-                $ticketQueued   = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
-                $ticketPrinting = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
-                $ticketPrinted  = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
-                $ticketReprinted= PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
-                $ticketFailed   = PrintStatus::where('type', 'ticket')->where('name', 'failed')->first();
+                $ticketQueued    = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+                $ticketPrinting  = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+                $ticketPrinted   = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+                $ticketReprinted = PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
             
-                if (!$badgeQueued || !$badgePrinting || !$badgePrinted || !$ticketQueued || !$ticketPrinting || !$ticketPrinted) {
+                if (!$badgeQueued || !$badgePrinting || !$badgePrinted || !$badgeReprinted ||
+                    !$ticketQueued || !$ticketPrinting || !$ticketPrinted || !$ticketReprinted) {
                     return response()->json(['error' => 'Print statuses not configured'], 400);
                 }
             
@@ -203,52 +206,41 @@ class RegistrationController extends Controller
                     ]);
                 }
             
-                // ------------------------------------------------------
-                // ✅ Trigger print after scan (NOTED: print hook here)
-                // ------------------------------------------------------
-                try {
-                    // Badge flow
-                    if ($registration->badge_printed_status_id == $badgePrinted->id) {
-                        $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
-                    } else {
-                        $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
-                        $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
-                    
-                        // 🚀 HERE you will dispatch actual badge print job
-                        $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
-                    }
-                
-                    // Ticket flow
-                    if ($registration->ticket_printed_status_id == $ticketPrinted->id) {
-                        $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
-                    } else {
-                        $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
-                        $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
-                    
-                        // 🚀 HERE you will dispatch actual ticket print job
-                        $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
-                    }
-                
-                    Log::info('Registration scanned & printed', [
-                        'ticket_number' => $validated['ticket_number'],
-                        'user_id' => Auth::id(),
-                        'mode' => $currentMode
-                    ]);
-                
-                } catch (\Exception $e) {
-                    if ($badgeFailed) $registration->update(['badge_printed_status_id' => $badgeFailed->id]);
-                    if ($ticketFailed) $registration->update(['ticket_printed_status_id' => $ticketFailed->id]);
-                
-                    Log::error('Printing failed after scan', [
-                        'ticket_number' => $validated['ticket_number'],
-                        'error' => $e->getMessage()
-                    ]);
-                
-                    return response()->json(['error' => 'Failed to print after scan'], 500);
+                // --- Badge flow with one-time reprint limit ---
+                $badgeStatusId = $registration->badge_printed_status_id;
+                if ($badgeStatusId === $badgeReprinted->id) {
+                    return response()->json(['error' => 'Badge already reprinted once. Reprint limit reached.'], 409);
+                } elseif ($badgeStatusId === $badgePrinted->id) {
+                    // allow exactly one reprint
+                    $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
+                } else {
+                    // not_printed (or other) → queue → printing → printed
+                    $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                    $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+                    $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
                 }
             
+                // --- Ticket flow (mirror; optional to enforce limit the same way) ---
+                $ticketStatusId = $registration->ticket_printed_status_id;
+                if ($ticketStatusId === $ticketReprinted->id) {
+                    // Uncomment to enforce one-time ticket reprint as well:
+                    // return response()->json(['error' => 'Ticket already reprinted once.'], 409);
+                } elseif ($ticketStatusId === $ticketPrinted->id) {
+                    $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
+                } else {
+                    $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+                }
+            
+                Log::info('Registration scanned; statuses updated', [
+                    'ticket_number' => $ticket,
+                    'user_id' => Auth::id(),
+                    'mode' => $currentMode
+                ]);
+            
                 return response()->json([
-                    'message' => 'QR scanned → print triggered → marked printed/reprinted',
+                    'message' => 'Scanned. Print statuses updated (printed/reprinted).',
                     'scan' => $scan,
                     'registration' => $registration->fresh(),
                 ], 200);

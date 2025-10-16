@@ -137,7 +137,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/{registration:ticket_number}', [RegistrationController::class, 'show'])
             ->middleware('can:view-registrations');
         Route::post('/{ticket_number}/scan', [RegistrationController::class, 'scan'])
-            ->middleware('can:view-registrations');
+            ->middleware('can:scan-registration');
         Route::put('/{registration}', [RegistrationController::class, 'update'])
             ->middleware('can:edit-registration');
         Route::delete('/{registration}', [RegistrationController::class, 'destroy'])

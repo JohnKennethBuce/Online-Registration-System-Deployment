@@ -23,6 +23,7 @@ enum Permission: string
     case CREATE_REGISTRATION = 'create-registration';
     case EDIT_REGISTRATION = 'edit-registration';
     case DELETE_REGISTRATION = 'delete-registration';
+    case SCAN_REGISTRATION = 'scan-registration';
 
     // User Management Permissions
     case VIEW_USERS = 'view-users';
