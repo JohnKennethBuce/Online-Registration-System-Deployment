@@ -71,6 +71,16 @@ function App() {
 
           {/* Protected Dashboard Routes are now nested */}
           <Route 
+            path="/onsite" 
+            element={
+              <ProtectedRoute roles={["admin", "superadmin"]}>
+                <OnsiteRegistrationPage />
+              </ProtectedRoute>
+            }
+          ></Route>
+
+          {/* Protected Dashboard Routes are now nested */}
+          <Route 
             path="/dashboard" 
             element={
               <ProtectedRoute roles={["admin", "superadmin"]}>

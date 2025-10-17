@@ -6,23 +6,26 @@ import EditRegistrationForm from "../components/EditRegistrationForm";
 import { useAuth } from "../context/AuthContext";
 
 export default function Registrations() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [registrations, setRegistrations] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [scanning, setScanning] = useState(false);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-
-  const backendUrl = api.defaults.baseURL.replace("/api", "");
-  const backendBase = api.defaults.baseURL; // e.g. http://127.0.0.1:8000/api
   const [printingId, setPrintingId] = useState(null);
-
-  // --- Modal state ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRegistration, setEditingRegistration] = useState(null);
 
+  const backendBase = api.defaults.baseURL;
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  // 🔐 --- Authorization Check ---
+  const isAuthorized =
+    user &&
+    ["admin", "superadmin"].includes(user.role?.name) &&
+    user.role?.permissions?.includes("view-registrations");
+
+  // --- Fetch registrations ---
   const fetchRegistrations = async (url = "/registrations") => {
     setLoading(true);
     try {
@@ -37,8 +40,8 @@ export default function Registrations() {
   };
 
   useEffect(() => {
-    fetchRegistrations();
-  }, []);
+    if (isAuthorized) fetchRegistrations();
+  }, [isAuthorized]);
 
   const handleEditClick = (reg) => {
     setEditingRegistration(reg);
@@ -83,20 +86,16 @@ export default function Registrations() {
     }
   };
 
-  // Print like the scanner: update statuses (scan) then open badge, then refresh
   const handlePrintBadge = async (reg) => {
     setError("");
     const ticket = reg.ticket_number;
 
-    // Open a blank tab first to avoid popup blockers
     const printWin = window.open("", "_blank");
     setPrintingId(reg.id);
 
     try {
-      // 1) Update statuses + create scan log (printed / one-time reprinted; superadmin unlimited)
       await api.post(`/registrations/${ticket}/scan`);
 
-      // 2) Navigate the opened tab to the React badge print page
       const badgeUrl = `/print-badge/${ticket}`;
       if (printWin) {
         printWin.location = badgeUrl;
@@ -105,7 +104,6 @@ export default function Registrations() {
         window.open(badgeUrl, "_blank");
       }
 
-      // 3) Refresh the current table page to reflect updated statuses
       const currentPage = pagination?.meta?.current_page;
       fetchRegistrations(currentPage ? `/registrations?page=${currentPage}` : "/registrations");
     } catch (err) {
@@ -125,7 +123,6 @@ export default function Registrations() {
           : err.response?.data?.error || err.response?.data?.message || "Scan/print failed.";
       setError(msg);
 
-      // Optional: allow printing anyway (manual override)
       if (code && code !== 401) {
         const proceed = window.confirm(`${msg}\nOpen badge page anyway?`);
         if (proceed) {
@@ -138,7 +135,15 @@ export default function Registrations() {
     }
   };
 
-  // ... (Your camera scanning functions can remain here if you use them)
+  // --- UI Rendering ---
+  if (authLoading) return <p>⏳ Checking authorization...</p>;
+  if (!user) return <p style={{ color: "red", padding: "20px" }}>🔒 You must be logged in to view this page.</p>;
+  if (!isAuthorized)
+    return (
+      <div style={{ padding: "20px", color: "red" }}>
+        ❌ Access Denied. You do not have permission to view registrations.
+      </div>
+    );
 
   if (loading) return <p>⏳ Loading registrations...</p>;
   if (error) return <p style={{ color: "red" }}>❌ {error}</p>;
@@ -151,10 +156,16 @@ export default function Registrations() {
         <span>
           Page {pagination?.meta?.current_page} of {pagination?.meta?.last_page}
         </span>
-        <button onClick={() => fetchRegistrations(pagination.links.prev)} disabled={!pagination?.links?.prev || loading}>
+        <button
+          onClick={() => fetchRegistrations(pagination.links.prev)}
+          disabled={!pagination?.links?.prev || loading}
+        >
           « Previous
         </button>
-        <button onClick={() => fetchRegistrations(pagination.links.next)} disabled={!pagination?.links?.next || loading}>
+        <button
+          onClick={() => fetchRegistrations(pagination.links.next)}
+          disabled={!pagination?.links?.next || loading}
+        >
           Next »
         </button>
         <span style={{ marginLeft: "auto" }}>Total Records: {pagination?.meta?.total}</span>
@@ -184,14 +195,12 @@ export default function Registrations() {
                   {printingId === reg.id ? "Printing…" : "Print Badge"}
                 </button>
 
-                {/* Only show Edit button if user has permission */}
                 {user.role?.permissions?.includes("edit-registration") && (
                   <button onClick={() => handleEditClick(reg)} style={{ margin: "0 5px" }}>
                     Edit
                   </button>
                 )}
 
-                {/* Only show Delete button if user has permission */}
                 {user.role?.permissions?.includes("delete-registration") && (
                   <button onClick={() => handleDelete(reg.id)} style={{ color: "red" }}>
                     Delete
@@ -203,7 +212,6 @@ export default function Registrations() {
         </tbody>
       </table>
 
-      {/* --- The Modal for Editing --- */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Edit Registration">
         {editingRegistration && (
           <EditRegistrationForm

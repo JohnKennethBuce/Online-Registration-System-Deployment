@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 
 export default function OnsiteRegistrationPage() {
+  const { user } = useAuth();
   const [serverMode, setServerMode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
@@ -57,6 +59,10 @@ export default function OnsiteRegistrationPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!user || !['admin', 'superadmin'].includes(user.role?.name)) {
+      setError('You must be logged in as an admin or superadmin to perform registration.');
+      return;
+    }
     setIsSubmitting(true);
     setError('');
     setMessage('');
@@ -68,7 +74,7 @@ export default function OnsiteRegistrationPage() {
       setMessage('✅ Registration Successful! Your badge is now printing...');
 
       // Auto-print logic
-      const badgeUrl = `${api.defaults.baseURL}/registrations/${ticketNumber}/badge?show_qr=false&print=true`;
+      const badgeUrl = `/print-badge/${ticketNumber}`;
 
       // Opening immediately after click reduces popup blockers
       window.open(badgeUrl, '_blank');
