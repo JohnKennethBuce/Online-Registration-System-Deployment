@@ -22,31 +22,31 @@ export default function BadgePrint({ settings, registration, showQr = false }) {
   return (
   <div
   style={{
-    width: "7.5cm",
-    height: "7.5cm",
+    width: "7.5cm", // Default width; adjust this value as needed
+    height: "7.5cm", // Default height; adjust this value as needed
     paddingTop: "10px",    // Default top padding; adjust this value as needed
     paddingRight: "5px",  // Default right padding; adjust this value as needed
     paddingBottom: "120px", // Default bottom padding; adjust this value as needed
     paddingLeft: "40px",   // Default left padding; adjust this value as needed
-    boxSizing: "border-box",
-    background: "#fff",
-    color: "#111",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    fontFamily: "Instrument Sans, sans-serif",
-    border: "1px solid #ccc",
-    position: "relative",
-    overflow: "visible",
+    boxSizing: "border-box", // Ensure padding is included in the total width/height
+    background: "#fff", // White background for printing
+    color: "#111", // Dark text for readability
+    display: "flex", // Use flexbox for layout
+    flexDirection: "column", // Stack children vertically
+    justifyContent: "space-between", // Space out header, content, and footer
+    fontFamily: "Instrument Sans, sans-serif", // Use the custom font
+    border: "1px solid #ccc", // Light border for badge outline
+    position: "relative", // For any absolute positioning inside
+    overflow: "visible", // Ensure content isn't clipped
   }}
 >
-      {/* HEADER */}
+      {/* HEADER */} 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", marginBottom: "3px" }}> 
         {mainLogo && (
           <img src={mainLogo} alt="Main Logo" style={{ maxWidth: "60px", maxHeight: "50px" }} /> 
         )}
-        <div style={{ textAlign: "left", fontSize: "12px", lineHeight: "1.2" }}> 
-          <div>{settings.event_location || "Event Location"}</div>
+        <div style={{ textAlign: "left", fontSize: "12px", lineHeight: "1.2" }}>  
+          <div>{settings.event_location || "Event Location"}</div> 
           <div>{settings.event_datetime || "Event Date & Time"}</div>
         </div>
       </div>
