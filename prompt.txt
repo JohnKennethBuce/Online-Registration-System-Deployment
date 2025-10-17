@@ -1753,7 +1753,912 @@ export default function ProtectedRoute({ children, roles }) {
   }
 
   return children;
+} 
+
+
+
+
+
+
+
+10 / 16 / 17 
+let's add another page Reports, First let's add more data needed in our DashboardController so we will display to new page report in our frontend 
+
+here's the Migrated Tables 
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::create('registrations', function (Blueprint $table) {
+            $table->id();
+
+            // Encrypted personal info
+            $table->text('first_name');
+            $table->text('last_name');
+            $table->text('email');
+            $table->text('phone')->nullable();
+            $table->text('address')->nullable();
+
+            $table->enum('registration_type', ['onsite','online','pre-registered'])->index();
+
+            // Ticket / QR
+            $table->string('ticket_number', 100)->unique()->nullable();
+            $table->string('qr_code_path', 255)->nullable();
+
+            $table->enum('server_mode', ['onsite','online','both'])->default('onsite')->index();
+
+            // Print statuses
+            $table->foreignId('badge_printed_status_id')->nullable()
+                  ->constrained('print_statuses')->nullOnDelete();
+            $table->foreignId('ticket_printed_status_id')->nullable()
+                  ->constrained('print_statuses')->nullOnDelete();
+
+            // Confirmation
+            $table->boolean('confirmed')->default(false);
+            $table->foreignId('confirmed_by')->nullable()
+                  ->constrained('users')->nullOnDelete();
+            $table->timestamp('confirmed_at')->nullable();
+
+            // Who registered
+            $table->foreignId('registered_by')->nullable()
+                  ->constrained('users')->nullOnDelete();
+
+            // Paid or Unpaid 
+            $table->enum('payment_status', ['paid', 'unpaid'])->default('unpaid')->index();
+
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('registrations');
+    }
+};  
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('print_statuses', function (Blueprint $table) {
+            $table->id(); // Primary Key
+
+            // Badge or Ticket status
+            $table->enum('type', ['badge', 'ticket'])
+                  ->comment('Defines whether this status applies to badges or tickets');
+
+            // Status name (unique within type)
+            $table->string('name', 50)
+                  ->comment('E.g., not_printed, printed, reprinted');
+
+            $table->text('description')->nullable()
+                  ->comment('Optional description of the status meaning');
+
+            // Active flag
+            $table->tinyInteger('active')->default(1)
+                 ->comment('1 = Active, 0 = Disabled');  // Added comment
+
+            // Timestamps
+            $table->timestamps();
+
+            // Constraints & Indexes
+            $table->unique(['type', 'name']); // Prevent duplicate status names for same type
+            $table->index('type'); // Quick lookups by type
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('print_statuses');
+    }
+};
+
+Backend modification
+Basically we need to display this tables so The report will be perfect just help me add it to our Dashboardcontroller. 
+also our RegistrationController Cause I just Recently add the payment_status 
+
+Frontend modification
+before we set up Reports We need to Update our Registration.jsx to add payment status dropdown too
+here's data we needed to display 
+
+
+Search bar for specific data report
+Printed counts 
+Re-Printed counts 
+paid counts 
+unpaid counts
+Total Registrant
+
+then 
+Table like Report, base it on the image I sent
+Display all the needed data on the table, as you can see our migrations involved on this report 
+
+and last but not the least this is the best part. add Export to pdf, 
+
+
+Here's my current DashboardController 
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\Registration;
+use App\Models\ServerMode;
+use App\Models\Scan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
+use App\Models\Setting;
+
+
+
+class DashboardController extends Controller
+{
+
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum'); // Ensure authenticated user
+    }
+    /**
+     * Dashboard summary (all key stats in one payload).
+     */
+    public function summary(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+        
+            // Each user gets their own cache. A superadmin sees all, an admin sees their own.
+            $cacheKey = "dashboard_summary:role_{$user->role->name}:user_{$user->id}";
+        
+            // Store the result for 10 minutes. If the key exists, it's returned instantly.
+            // If not, the closure runs, and its result is stored and returned.
+            $summaryData = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($user) {
+                $isSuperAdmin = $user->role->name === 'superadmin';
+                $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
+            
+                $baseQuery = fn ($q) => $isSuperAdmin ? $q : $q->where('registered_by', $user->id);
+            
+                // The exact same queries from before, now inside the cache closure
+                return [
+                    'server_mode'           => $currentMode,
+                    'registrations_by_type' => $baseQuery(Registration::select('registration_type', DB::raw('count(*) as total'))->groupBy('registration_type'))->get(),
+                    'confirmed_vs_pending'  => $baseQuery(Registration::select('confirmed', DB::raw('count(*) as total'))->groupBy('confirmed'))->get(),
+                    'badge_statuses'        => $baseQuery(Registration::select('badge_printed_status_id', DB::raw('count(*) as total'))->groupBy('badge_printed_status_id'))->get(),
+                    'ticket_statuses'       => $baseQuery(Registration::select('ticket_printed_status_id', DB::raw('count(*) as total'))->groupBy('ticket_printed_status_id'))->get(),
+                    'scans_per_user'        => User::withCount('scans')->get(),
+                ];
+            });
+        
+            return response()->json($summaryData);
+        
+        } 
+        
+        catch (\Exception $e) {
+            Log::error('Dashboard summary error: ' . $e->getMessage());
+            return response()->json([
+                'error'   => 'Failed to fetch dashboard summary',
+                'message' => $e->getMessage()
+            ], 500);
+            
+            }
+        }
+
+    // ------------------------------
+    // Queries extracted as reusable functions with role filtering
+    // ------------------------------
+
+    private function getRegistrationsByType(bool $isSuperAdmin)
+    {
+        $query = Registration::select('registration_type', DB::raw('count(*) as total'))
+            ->groupBy('registration_type');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getConfirmedVsPending(bool $isSuperAdmin)
+    {
+        $query = Registration::select('confirmed', DB::raw('count(*) as total'))
+            ->groupBy('confirmed');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getBadgeStatuses(bool $isSuperAdmin)
+    {
+        $query = Registration::select('badge_printed_status_id', DB::raw('count(*) as total'))
+            ->groupBy('badge_printed_status_id');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getTicketStatuses(bool $isSuperAdmin)
+    {
+        $query = Registration::select('ticket_printed_status_id', DB::raw('count(*) as total'))
+            ->groupBy('ticket_printed_status_id');
+        return $isSuperAdmin ? $query->get() : $query->where('registered_by', Auth::id())->get();
+    }
+
+    private function getScansPerUser(bool $isSuperAdmin)
+    {
+        $query = User::withCount('scans')
+            ->select(['id', 'role_id', 'name', 'email', 'phone', 'status', 'created_by', 'created_at', 'updated_at']);
+        return $isSuperAdmin ? $query->get() : $query->where('id', Auth::id())->get();
+    }
+
+    // ------------------------------
+    // API endpoints reusing queries
+    // ------------------------------
+
+    public function registrationsBreakdown(): JsonResponse
+    {
+        try {
+            return response()->json($this->getRegistrationsByType(Auth::user()->role->name === 'superadmin'));
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Failed to fetch registration breakdown',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Detailed stats breakdown by ServerMode.
+     */
+
+     public function stats(): JsonResponse
+     {
+         try {
+             $user = Auth::user();
+             $isSuperAdmin = $user->role->name === 'superadmin';
+             $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
+ 
+             $baseQuery = fn ($q) => $isSuperAdmin ? $q : $q->where('registered_by', $user->id);
+ 
+             return response()->json([
+                 'server_mode' => $currentMode,
+                 'total_registrations' => $baseQuery(Registration::query())->count(),
+                 'by_mode' => Registration::select('server_mode', DB::raw('count(*) as total'))
+                     ->groupBy('server_mode')
+                     ->get(),
+                 'active_users' => $baseQuery(User::where('status', 'active'))->count(),
+                 'recent_scans' => Scan::where('scanned_time', '>', now()->subHours(24))->count(),
+             ]);
+         } catch (\Exception $e) {
+             Log::error('Stats error: ' . $e->getMessage());
+             return response()->json([
+                 'error'   => 'Failed to fetch stats',
+                 'message' => $e->getMessage()
+             ], 500);
+         }
+     }
+    
+
+    public function printStatusBreakdown(): JsonResponse
+    {
+        try {
+            $isSuperAdmin = Auth::user()->role->name === 'superadmin';
+            return response()->json([
+                'badge_statuses'  => $this->getBadgeStatuses($isSuperAdmin),
+                'ticket_statuses' => $this->getTicketStatuses($isSuperAdmin),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Failed to fetch print status breakdown',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Scans per user (admins & superadmin).
+     */
+    public function scansPerUser(): JsonResponse
+    {
+        try {
+            return response()->json($this->getScansPerUser(Auth::user()->role->name === 'superadmin'));
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Failed to fetch scans per user',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Logs endpoint for Super Admin.
+     */
+    public function logs(Request $request): JsonResponse
+    {
+        try {
+            if (Auth::user()->role->name !== 'superadmin') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $logs = Log::with('user')
+                ->when($request->input('action'), fn ($q) => $q->where('action', $request->input('action')))
+                ->when($request->input('target_type'), fn ($q) => $q->where('target_type', $request->input('target_type')))
+                ->when($request->input('user_id'), fn ($q) => $q->where('user_id', $request->input('user_id')))
+                ->latest()
+                ->paginate(50); // Paginate for better performance
+
+            return response()->json($logs);
+        } catch (\Exception $e) {
+            Log::error('Logs error: ' . $e->getMessage());
+            return response()->json([
+                'error'   => 'Failed to fetch logs',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload logos for badge/ticket (Super Admin only).
+     */
+     public function uploadLogo(Request $request): JsonResponse
+{
+    try {
+        if (Auth::user()->role->name !== 'superadmin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'logo_type' => 'required|in:event,organizer,manager,registration',
+            'logo_file' => 'required|image|max:2048', // Max 2MB
+        ]);
+
+        $logoType = $request->input('logo_type');
+        $file = $request->file('logo_file');
+
+        $settingKeyMap = [
+            'event'        => 'main_logo_path',
+            'organizer'    => 'organizer_logo_path',
+            'manager'      => 'manager_logo_path',
+            'registration' => 'registration_logo_path',
+        ];
+
+        $settingKey = $settingKeyMap[$logoType];
+
+        // 1) Get old path from settings
+        $existing = Setting::where('key', $settingKey)->first();
+        $oldPath = $existing?->value; // may be 'logos/foo.png' or 'storage/logos/foo.png'
+
+        // 2) Store new file on the 'public' disk → returns e.g. 'logos/new.png'
+        // Use store() so we always save a clean relative path (no 'storage/' prefix)
+        $newPath = $file->store('logos', 'public'); // e.g. 'logos/1700000000_event.png'
+
+        // 3) Delete old file if exists
+        if ($oldPath) {
+            // normalize old path to a relative path under 'public' disk
+            $oldRel = ltrim(str_replace('\\', '/', $oldPath), '/');
+            $oldRel = preg_replace('#^storage/#i', '', $oldRel); // strip leading 'storage/'
+            if ($oldRel && Storage::disk('public')->exists($oldRel)) {
+                Storage::disk('public')->delete($oldRel);
+            }
+        }
+
+        // 4) Save new path to settings (always relative)
+        Setting::updateOrCreate(
+            ['key' => $settingKey],
+            ['value' => $newPath]
+        );
+
+        Log::info('Logo uploaded and setting updated', [
+            'type' => $logoType,
+            'path' => $newPath,
+            'user_id' => Auth::id(),
+        ]);
+
+        return response()->json([
+            'message' => 'Logo uploaded successfully',
+            'path' => $newPath,                       // relative path for DB
+            'url'  => asset('storage/' . $newPath),   // absolute URL for convenience
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Logo upload error: ' . $e->getMessage());
+        return response()->json([
+            'error'   => 'Failed to upload logo',
+            'message' => $e->getMessage()
+        ], 500);
+    }
 }
+
+    /**
+     * Retrieve available logos (for badge/ticket rendering).
+     */
+    public function getLogos(): JsonResponse
+{
+    try {
+        $files = Storage::disk('public')->files('logos');
+        $items = array_map(function ($path) {
+            return [
+                'path' => $path,                     // e.g., logos/foo.png
+                'url'  => asset('storage/' . $path) // absolute URL
+            ];
+        }, $files);
+
+        return response()->json(['logos' => $items]);
+    } catch (\Exception $e) {
+        Log::error('Get logos error: ' . $e->getMessage());
+        return response()->json([
+            'error'   => 'Failed to retrieve logos',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+}
+
+} 
+
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Registration;
+use App\Models\PrintStatus;
+use App\Models\ServerMode;
+use App\Models\Scan;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Crypt;
+use App\Jobs\GenerateQrCode;
+use Illuminate\Validation\Rule;
+
+class RegistrationController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum')->except(['store']);
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $perPage = $request->validate(['per_page' => 'integer|min:10|max:100'])['per_page'] ?? 50;
+        $registrations = Registration::with(['badgeStatus', 'ticketStatus'])->latest()->paginate($perPage);
+        return response()->json($registrations);
+    }
+
+    public function store(Request $request): JsonResponse
+        {
+            $validated = $request->validate([
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:registrations,email',
+                'phone' => 'nullable|string|max:20',
+                'address' => 'nullable|string|max:255',
+                'company_name' => 'nullable|string|max:255',
+                'registration_type' => 'required|in:onsite,online,pre-registered',
+            ]);
+
+            // Check for duplicate email hash
+            $emailHash = hash('sha256', strtolower(trim($validated['email'])));
+            if (Registration::where('email_hash', $emailHash)->exists()) {
+                return response()->json(['error' => 'This email address is already registered.'], 409);
+            }
+
+            // ServerMode validation
+            $serverMode = ServerMode::latest()->first();
+            if (!$serverMode) {
+                return response()->json(['error' => 'Server mode not configured.'], 500);
+            }
+            $allowedTypes = explode(',', str_replace('both', 'onsite,online', $serverMode->mode));
+            if (!in_array($validated['registration_type'], $allowedTypes)) {
+                return response()->json(['error' => 'Registration type not allowed in current mode'], 400);
+            }
+
+            // PrintStatus setup
+            $badgeNotPrinted = PrintStatus::where('type', 'badge')->where('name', 'not_printed')->first();
+            $ticketNotPrinted = PrintStatus::where('type', 'ticket')->where('name', 'not_printed')->first();
+            if (!$badgeNotPrinted || !$ticketNotPrinted) {
+                return response()->json(['error' => 'Print statuses not configured.'], 500);
+            }
+
+            // Create Registration first
+            $ticketNumber = 'TICKET-' . strtoupper(Str::random(12));
+            $registration = Registration::create([
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'],
+                'email_hash' => $emailHash,
+                'phone' => $validated['phone'],
+                'address' => $validated['address'],
+                'company_name' => $validated['company_name'],
+                'registration_type' => $validated['registration_type'],
+                'server_mode' => $serverMode->mode,
+                'badge_printed_status_id' => $badgeNotPrinted->id,
+                'ticket_printed_status_id' => $ticketNotPrinted->id,
+                'ticket_number' => $ticketNumber,
+                'registered_by' => Auth::id(),
+            ]);
+
+            // ✅ Dispatch a job to handle QR code generation in the background
+           (new GenerateQrCode($registration))->handle();
+
+
+            Log::info('Registration created and QR job dispatched', [
+                'ticket_number' => $ticketNumber,
+                'user_id' => Auth::id(),
+                'mode' => $serverMode->mode
+            ]);
+            
+            $fresh = $registration->fresh();
+            
+            // Normalize path and build a web URL if available
+            $qrUrl = $fresh->qr_code_path
+                ? asset('storage/' . ltrim(str_replace('\\', '/', $fresh->qr_code_path), '/'))
+                : null;
+            
+            return response()->json([
+                'message' => 'Registration successful. The QR code will be generated shortly.',
+                'registration' => array_merge($fresh->toArray(), [
+                    'qr_url' => $qrUrl,
+                ]),
+            ], 201);
+        }
+        
+        public function show($ticketNumber): JsonResponse
+            {
+                $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+                return response()->json([
+                    'message' => 'Registration retrieved successfully',
+                    'registration' => $registration,
+                ]);
+            }
+
+        public function update(Request $request, Registration $registration)
+            {
+                $validated = $request->validate([
+                    'first_name' => 'required|string|max:255',
+                    'last_name' => 'required|string|max:255',
+                    'email' => ['required', 'email', 'max:255', Rule::unique('registrations')->ignore($registration->id)],
+                    'phone' => 'nullable|string|max:20',
+                    'address' => 'nullable|string|max:255',
+                    'company_name' => 'nullable|string|max:255',
+                    'registration_type' => 'required|in:onsite,online,pre-registered',
+                ]);
+                
+                // Update the email_hash if the email has changed
+                if ($registration->email !== $validated['email']) {
+                    $validated['email_hash'] = hash('sha256', strtolower(trim($validated['email'])));
+                }
+                
+                // The model's accessors/mutators will handle encryption automatically
+                $registration->update($validated);
+                
+                return response()->json($registration->fresh());
+            }
+
+        /**
+         * Delete a registration.
+         */
+        public function destroy(Registration $registration)
+            {
+                $registration->delete();
+            
+                return response()->json(null, 204); // 204 No Content success response
+            }
+        public function scan(Request $request, ?string $ticket_number = null): JsonResponse
+            {
+                // Accept from route param or request body
+                $ticket = $ticket_number ?: $request->input('ticket_number');
+                if (!$ticket) {
+                    return response()->json(['error' => 'ticket_number is required'], 422);
+                }
+            
+                $registration = Registration::where('ticket_number', $ticket)->firstOrFail();
+                $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
+            
+                if ($registration->server_mode !== $currentMode && $currentMode !== 'both') {
+                    return response()->json(['error' => 'Scan not allowed in current mode'], 403);
+                }
+            
+                // Superadmin can reprint unlimited
+                $isSuperAdmin = optional($request->user()->role)->name === 'superadmin';
+            
+                // --- Statuses ---
+                $badgeQueued     = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+                $badgePrinting   = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+                $badgePrinted    = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+                $badgeReprinted  = PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
+            
+                $ticketQueued    = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+                $ticketPrinting  = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+                $ticketPrinted   = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+                $ticketReprinted = PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
+            
+                if (!$badgeQueued || !$badgePrinting || !$badgePrinted || !$badgeReprinted ||
+                    !$ticketQueued || !$ticketPrinting || !$ticketPrinted || !$ticketReprinted) {
+                    return response()->json(['error' => 'Print statuses not configured'], 400);
+                }
+            
+                // --- Create scan log ---
+                $scan = Scan::create([
+                    'registration_id' => $registration->id,
+                    'scanned_by' => Auth::id(),
+                    'scanned_time' => now(),
+                    'badge_printed_status_id' => $badgeQueued->id,
+                    'ticket_printed_status_id' => $ticketQueued->id,
+                ]);
+            
+                // --- Auto confirm if not already ---
+                if (!$registration->confirmed) {
+                    $registration->update([
+                        'confirmed' => true,
+                        'confirmed_by' => Auth::id(),
+                        'confirmed_at' => now(),
+                    ]);
+                }
+            
+                // --- Badge flow with one-time reprint limit (superadmin bypass) ---
+                $badgeStatusId = $registration->badge_printed_status_id;
+                if ($badgeStatusId === $badgeReprinted->id) {
+                    if (!$isSuperAdmin) {
+                        return response()->json(['error' => 'Badge already reprinted once. Reprint limit reached.'], 409);
+                    }
+                    // superadmin: allow additional prints; keep status as "reprinted"
+                    // no change needed
+                } elseif ($badgeStatusId === $badgePrinted->id) {
+                    // printed → reprinted
+                    $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
+                } else {
+                    // not_printed (or other) → queue → printing → printed
+                    $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                    $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+                    $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
+                }
+            
+                // --- Ticket flow (mirror; optional to enforce limit the same way) ---
+                $ticketStatusId = $registration->ticket_printed_status_id;
+                if ($ticketStatusId === $ticketReprinted->id) {
+                    if ($isSuperAdmin) {
+                        // allow; keep as reprinted
+                    } else {
+                        // If you want the same strict limit for tickets, uncomment:
+                        // return response()->json(['error' => 'Ticket already reprinted once. Reprint limit reached.'], 409);
+                    }
+                } elseif ($ticketStatusId === $ticketPrinted->id) {
+                    $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
+                } else {
+                    $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+                }
+            
+                Log::info('Registration scanned; statuses updated', [
+                    'ticket_number' => $ticket,
+                    'user_id' => Auth::id(),
+                    'mode' => $currentMode,
+                    'superadmin_bypass' => $isSuperAdmin,
+                ]);
+            
+                return response()->json([
+                    'message' => 'Scanned. Print statuses updated (printed/reprinted).',
+                    'scan' => $scan,
+                    'registration' => $registration->fresh(),
+                ], 200);
+            }
+
+            public function printBadge($ticketNumber): JsonResponse
+            {
+                $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+            
+                $badgeQueued = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+                $badgePrinting = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+                $badgePrinted = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+                $badgeFailed = PrintStatus::where('type', 'badge')->where('name', 'failed')->first();
+            
+                if (!$badgeQueued || !$badgePrinting || !$badgePrinted) {
+                    return response()->json(['error' => 'Badge print statuses not configured'], 400);
+                }
+            
+                // Transition to queued
+                $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                Log::info('Badge print queued', ['ticket_number' => $ticketNumber]);
+            
+                try {
+                    // Transition to printing
+                    $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+            
+                    // 🚀 Simulate actual print job here (dispatch to printer)
+                    // If successful → mark printed
+                    $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
+            
+                    Log::info('Badge printed', ['ticket_number' => $ticketNumber, 'user_id' => Auth::id()]);
+                    return response()->json([
+                        'message' => 'Badge marked as printed',
+                        'registration' => $registration->fresh(),
+                    ], 200);
+            
+                } catch (\Exception $e) {
+                    if ($badgeFailed) {
+                        $registration->update(['badge_printed_status_id' => $badgeFailed->id]);
+                    }
+                    Log::error('Badge printing failed', ['ticket_number' => $ticketNumber, 'error' => $e->getMessage()]);
+                    return response()->json(['error' => 'Failed to print badge'], 500);
+                }
+            }
+
+            public function printTicket($ticketNumber): JsonResponse
+            {
+                $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+            
+                $ticketQueued = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+                $ticketPrinting = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+                $ticketPrinted = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+                $ticketFailed = PrintStatus::where('type', 'ticket')->where('name', 'failed')->first();
+            
+                if (!$ticketQueued || !$ticketPrinting || !$ticketPrinted) {
+                    return response()->json(['error' => 'Ticket print statuses not configured'], 400);
+                }
+            
+                // Transition to queued
+                $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                Log::info('Ticket print queued', ['ticket_number' => $ticketNumber]);
+            
+                try {
+                    // Transition to printing
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+                
+                    // 🚀 Simulate actual print job here (dispatch to printer)
+                    $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+                
+                    Log::info('Ticket printed', ['ticket_number' => $ticketNumber, 'user_id' => Auth::id()]);
+                    return response()->json([
+                        'message' => 'Ticket marked as printed',
+                        'registration' => $registration->fresh(),
+                    ], 200);
+                
+                } catch (\Exception $e) {
+                    if ($ticketFailed) {
+                        $registration->update(['ticket_printed_status_id' => $ticketFailed->id]);
+                    }
+                    Log::error('Ticket printing failed', ['ticket_number' => $ticketNumber, 'error' => $e->getMessage()]);
+                    return response()->json(['error' => 'Failed to print ticket'], 500);
+                }
+            } 
+
+             /**
+     * Unified: Scan QR + Auto print Badge
+     */
+    public function scanAndPrintBadge($ticketNumber): JsonResponse
+    {
+        $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+
+        $badgeQueued   = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+        $badgePrinting = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+        $badgePrinted  = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+        $badgeReprinted= PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
+        $badgeFailed   = PrintStatus::where('type', 'badge')->where('name', 'failed')->first();
+
+        if (!$badgeQueued || !$badgePrinting || !$badgePrinted) {
+            return response()->json(['error' => 'Badge print statuses not configured'], 400);
+        }
+
+        // --- Create scan log
+        $scan = Scan::create([
+            'registration_id' => $registration->id,
+            'scanned_by' => Auth::id(),
+            'scanned_time' => now(),
+            'badge_printed_status_id' => $badgeQueued->id,
+        ]);
+
+        try {
+            // If already printed → mark as reprinted
+            if ($registration->badge_printed_status_id == $badgePrinted->id) {
+                $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
+            } else {
+                $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+
+                // 🚀 Simulate print here
+                $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
+            }
+
+            Log::info('Scan + badge print complete', [
+                'ticket_number' => $ticketNumber,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'message' => 'Scanned → Badge printed',
+                'scan' => $scan,
+                'registration' => $registration->fresh(),
+            ], 200);
+
+        } catch (\Exception $e) {
+            if ($badgeFailed) {
+                $registration->update(['badge_printed_status_id' => $badgeFailed->id]);
+            }
+            Log::error('Badge printing failed after scan', [
+                'ticket_number' => $ticketNumber,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Failed to print badge after scan'], 500);
+        }
+    }
+
+    /**
+     * Unified: Scan QR + Auto print Ticket
+     */
+    public function scanAndPrintTicket($ticketNumber): JsonResponse
+    {
+        $registration = Registration::where('ticket_number', $ticketNumber)->firstOrFail();
+
+        $ticketQueued   = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+        $ticketPrinting = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+        $ticketPrinted  = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+        $ticketReprinted= PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
+        $ticketFailed   = PrintStatus::where('type', 'ticket')->where('name', 'failed')->first();
+
+        if (!$ticketQueued || !$ticketPrinting || !$ticketPrinted) {
+            return response()->json(['error' => 'Ticket print statuses not configured'], 400);
+        }
+
+        // --- Create scan log
+        $scan = Scan::create([
+            'registration_id' => $registration->id,
+            'scanned_by' => Auth::id(),
+            'scanned_time' => now(),
+            'ticket_printed_status_id' => $ticketQueued->id,
+        ]);
+
+        try {
+            // If already printed → mark as reprinted
+            if ($registration->ticket_printed_status_id == $ticketPrinted->id) {
+                $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
+            } else {
+                $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+
+                // 🚀 Simulate print here
+                $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+            }
+
+            Log::info('Scan + ticket print complete', [
+                'ticket_number' => $ticketNumber,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'message' => 'Scanned → Ticket printed',
+                'scan' => $scan,
+                'registration' => $registration->fresh(),
+            ], 200);
+
+        } catch (\Exception $e) {
+            if ($ticketFailed) {
+                $registration->update(['ticket_printed_status_id' => $ticketFailed->id]);
+            }
+            Log::error('Ticket printing failed after scan', [
+                'ticket_number' => $ticketNumber,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Failed to print ticket after scan'], 500);
+        }
+    }
+}
+
+
+
 
 
  

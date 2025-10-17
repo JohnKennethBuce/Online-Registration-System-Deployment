@@ -18,7 +18,7 @@ class Registration extends Model
 
         // allow controller updates on these fields
         'confirmed', 'confirmed_by', 'registered_by',
-        'badge_printed_status_id', 'ticket_printed_status_id',
+        'badge_printed_status_id', 'ticket_printed_status_id', 'payment_status',
     ];
 
     // Remove guarded to allow mass-assignment of the fields above

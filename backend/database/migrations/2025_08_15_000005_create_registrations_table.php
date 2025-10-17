@@ -41,6 +41,9 @@ return new class extends Migration {
             $table->foreignId('registered_by')->nullable()
                   ->constrained('users')->nullOnDelete();
 
+            // Paid or Unpaid 
+            $table->enum('payment_status', ['paid', 'unpaid'])->default('unpaid')->index();
+
             $table->timestamps();
         });
     }
