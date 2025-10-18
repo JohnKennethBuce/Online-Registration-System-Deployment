@@ -192,7 +192,7 @@ class RegistrationController extends Controller
                     'scanned_time' => now(),
                     'badge_printed_status_id' => $badgeQueued->id,
                     'ticket_printed_status_id' => $ticketQueued->id,
-                    'payment_status' => $registration->payment_status->id,
+                    'payment_status' => $registration->payment_status,
                 ]);
             
                 // --- Auto confirm if not already ---

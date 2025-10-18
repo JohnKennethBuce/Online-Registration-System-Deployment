@@ -11,13 +11,15 @@ class Scan extends Model
 
     protected $fillable =[
         'registration_id', 'scanned_by', 'scanned_time', 'badge_printed_status_id',
-        'ticket_printed_status_id'
+        'ticket_printed_status_id', 'payment_status'
     ];
 
     protected $casts = [
+        'payment_status' => 'string',
         'scanned_time' => 'datetime',
         'created_at'  => 'datetime',
         'updated_at'  => 'datetime',
+
     ];
 
     //relationships

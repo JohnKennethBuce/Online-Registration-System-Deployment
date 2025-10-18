@@ -33,6 +33,7 @@ return new class extends Migration
             $table->index('scanned_time');
             $table->index(['registration_id', 'badge_printed_status_id']);
             $table->index(['registration_id', 'ticket_printed_status_id']);
+            $table->enum('payment_status', ['paid', 'unpaid'])->default('unpaid');
             $table->index('scanned_by');  // Added
         });
     }
