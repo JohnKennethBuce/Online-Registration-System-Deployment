@@ -450,5 +450,7 @@ class RegistrationController extends Controller
             ]);
             return response()->json(['error' => 'Failed to print ticket after scan'], 500);
         }
+        
     }
+    
 }

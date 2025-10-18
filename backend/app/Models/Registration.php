@@ -32,7 +32,22 @@ class Registration extends Model
     ];
 
     // Always append a web-safe QR URL to JSON
-    protected $appends = ['qr_url'];
+    protected $appends = ['qr_url', 'badge_status_display'];
+
+    public function getBadgeStatusDisplayAttribute(): array
+    {
+        $statusName = $this->badgeStatus->name ?? 'not_printed';
+
+        switch ($statusName) {
+            case 'printed':
+                return ['text' => 'PRINTED', 'color' => '#28a745'];
+            case 'reprinted':
+                return ['text' => 'RE-PRINTED', 'color' => '#fd7e14'];
+            case 'not_printed':
+            default:
+                return ['text' => 'NOT PRINTED', 'color' => '#6c757d'];
+        }
+    }
 
     // Accessor: returns a full HTTP URL to the QR image or null if not available
     public function getQrUrlAttribute(): ?string
