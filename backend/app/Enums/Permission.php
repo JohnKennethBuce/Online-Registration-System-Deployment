@@ -39,6 +39,9 @@ enum Permission: string
     case VIEW_SERVER_MODE = 'view-server-mode';
     case EDIT_SERVER_MODE = 'edit-server-mode';
 
+    // Report Permissions
+    case VIEW_REPORTS = 'view-reports';
+
     // Role Management Permissions
     case MANAGE_ROLES = 'manage-roles';
 

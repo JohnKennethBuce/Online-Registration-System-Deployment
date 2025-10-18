@@ -31,6 +31,7 @@ export default function EditRegistrationForm({ registration, onSave, onCancel })
         company_name: formData.company_name,
         email: formData.email, // Pass the decrypted email
         registration_type: formData.registration_type,
+        payment_status: formData.payment_status,
     };
     onSave(dataToSave);
 };
@@ -50,6 +51,27 @@ export default function EditRegistrationForm({ registration, onSave, onCancel })
       <div>
         <label>Company Name</label><br/>
         <input name="company_name" value={formData.company_name} onChange={handleChange} style={inputStyle} />
+      </div>
+
+      <div className="form-group" style={{ marginBottom: '12px' }}>
+        <label htmlFor="payment_status">Payment Status</label>
+        <select
+          id="payment_status"
+          name="payment_status"
+          value={formData.payment_status || 'unpaid'}
+          onChange={handleChange}
+          className="form-control"
+          style={{
+            width: '100%',
+            padding: '8px',
+            borderRadius: '6px',
+            border: '1px solid #ccc',
+            fontSize: '14px',
+          }}
+        >
+          <option value="unpaid">Unpaid</option>
+          <option value="paid">Paid</option>
+        </select>
       </div>
       {/* You can add more fields to edit here if needed */}
       <div style={{ marginTop: '20px', textAlign: 'right' }}>

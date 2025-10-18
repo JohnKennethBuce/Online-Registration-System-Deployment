@@ -136,81 +136,173 @@ export default function Registrations() {
   };
 
   // --- UI Rendering ---
-  if (authLoading) return <p>⏳ Checking authorization...</p>;
-  if (!user) return <p style={{ color: "red", padding: "20px" }}>🔒 You must be logged in to view this page.</p>;
+  if (authLoading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555" }}>⏳ Checking authorization...</p>;
+  if (!user) return <p style={{ color: "red", padding: "20px", textAlign: "center", fontSize: "1.2rem" }}>🔒 You must be logged in to view this page.</p>;
   if (!isAuthorized)
     return (
-      <div style={{ padding: "20px", color: "red" }}>
+      <div style={{ padding: "20px", color: "red", textAlign: "center", fontSize: "1.2rem" }}>
         ❌ Access Denied. You do not have permission to view registrations.
       </div>
     );
 
-  if (loading) return <p>⏳ Loading registrations...</p>;
-  if (error) return <p style={{ color: "red" }}>❌ {error}</p>;
+  if (loading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555" }}>⏳ Loading registrations...</p>;
+  if (error) return <p style={{ color: "red", textAlign: "center", fontSize: "1.2rem" }}>❌ {error}</p>;
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>📋 Registrations</h2>
+    <div style={{ padding: "20px", maxWidth: "1200px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+      <h2 style={{ fontSize: "1.8rem", marginBottom: "20px", color: "#333" }}>📋 Registrations</h2>
 
-      <div style={{ margin: "20px 0", display: "flex", alignItems: "center", gap: "10px" }}>
-        <span>
+      <div style={{ margin: "20px 0", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+        <span style={{ fontSize: "1rem", color: "#555" }}>
           Page {pagination?.meta?.current_page} of {pagination?.meta?.last_page}
         </span>
-        <button
-          onClick={() => fetchRegistrations(pagination.links.prev)}
-          disabled={!pagination?.links?.prev || loading}
-        >
-          « Previous
-        </button>
-        <button
-          onClick={() => fetchRegistrations(pagination.links.next)}
-          disabled={!pagination?.links?.next || loading}
-        >
-          Next »
-        </button>
-        <span style={{ marginLeft: "auto" }}>Total Records: {pagination?.meta?.total}</span>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            onClick={() => fetchRegistrations(pagination.links.prev)}
+            disabled={!pagination?.links?.prev || loading}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#007bff",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              opacity: (!pagination?.links?.prev || loading) ? 0.5 : 1,
+              transition: "background-color 0.3s",
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = "#0056b3"}
+            onMouseOut={(e) => e.target.style.backgroundColor = "#007bff"}
+          >
+            « Previous
+          </button>
+          <button
+            onClick={() => fetchRegistrations(pagination.links.next)}
+            disabled={!pagination?.links?.next || loading}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#007bff",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              opacity: (!pagination?.links?.next || loading) ? 0.5 : 1,
+              transition: "background-color 0.3s",
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = "#0056b3"}
+            onMouseOut={(e) => e.target.style.backgroundColor = "#007bff"}
+          >
+            Next »
+          </button>
+        </div>
+        <span style={{ fontSize: "1rem", color: "#555" }}>Total Records: {pagination?.meta?.total}</span>
       </div>
 
-      <table border="1" cellPadding="6" style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Company</th>
-            <th>Ticket Number</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {registrations.map((reg) => (
-            <tr key={reg.id}>
-              <td>{reg.id}</td>
-              <td>
-                {reg.first_name} {reg.last_name}
-              </td>
-              <td>{reg.company_name || "N/A"}</td>
-              <td>{reg.ticket_number}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>
-                <button onClick={() => handlePrintBadge(reg)} disabled={printingId === reg.id}>
-                  {printingId === reg.id ? "Printing…" : "Print Badge"}
-                </button>
-
-                {user.role?.permissions?.includes("edit-registration") && (
-                  <button onClick={() => handleEditClick(reg)} style={{ margin: "0 5px" }}>
-                    Edit
-                  </button>
-                )}
-
-                {user.role?.permissions?.includes("delete-registration") && (
-                  <button onClick={() => handleDelete(reg.id)} style={{ color: "red" }}>
-                    Delete
-                  </button>
-                )}
-              </td>
+      <div style={{ overflowX: "auto", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+          <thead>
+            <tr style={{ backgroundColor: "#f8f9fa", color: "#333" }}>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #ddd" }}>ID</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #ddd" }}>Name</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #ddd" }}>Company</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #ddd" }}>Ticket Number</th>
+              <th style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>Payment Status</th>
+              <th style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {registrations.map((reg, index) => (
+              <tr
+                key={reg.id}
+                style={{
+                  backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8f9fa",
+                  transition: "background-color 0.3s",
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = "#e2e6ea"}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? "#ffffff" : "#f8f9fa"}
+              >
+                <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.id}</td>
+                <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>
+                  {reg.first_name} {reg.last_name}
+                </td>
+                <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.company_name || "N/A"}</td>
+                <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.ticket_number}</td>
+                <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
+                  <span
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "20px",
+                      color: "white",
+                      backgroundColor: reg.payment_status === "paid" ? "#28a745" : "#dc3545",
+                      fontSize: "0.9rem",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {reg.payment_status?.toUpperCase() || "UNPAID"}
+                  </span>
+                </td>
+                <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd", display: "flex", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => handlePrintBadge(reg)}
+                    disabled={printingId === reg.id}
+                    style={{
+                      padding: "8px 12px",
+                      backgroundColor: "#17a2b8",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      opacity: printingId === reg.id ? 0.5 : 1,
+                      transition: "background-color 0.3s",
+                    }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = "#138496"}
+                    onMouseOut={(e) => e.target.style.backgroundColor = "#17a2b8"}
+                  >
+                    {printingId === reg.id ? "Printing…" : "Print Badge"}
+                  </button>
+
+                  {user.role?.permissions?.includes("edit-registration") && (
+                    <button
+                      onClick={() => handleEditClick(reg)}
+                      style={{
+                        padding: "8px 12px",
+                        backgroundColor: "#ffc107",
+                        color: "#212529",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        transition: "background-color 0.3s",
+                      }}
+                      onMouseOver={(e) => e.target.style.backgroundColor = "#e0a800"}
+                      onMouseOut={(e) => e.target.style.backgroundColor = "#ffc107"}
+                    >
+                      Edit
+                    </button>
+                  )}
+
+                  {user.role?.permissions?.includes("delete-registration") && (
+                    <button
+                      onClick={() => handleDelete(reg.id)}
+                      style={{
+                        padding: "8px 12px",
+                        backgroundColor: "#dc3545",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        transition: "background-color 0.3s",
+                      }}
+                      onMouseOver={(e) => e.target.style.backgroundColor = "#c82333"}
+                      onMouseOut={(e) => e.target.style.backgroundColor = "#dc3545"}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Edit Registration">
         {editingRegistration && (

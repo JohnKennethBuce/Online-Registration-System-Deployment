@@ -125,6 +125,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/stats', [DashboardController::class, 'stats']);
         Route::post('/upload-logo', [DashboardController::class, 'uploadLogo']);
         Route::get('/logos', [DashboardController::class, 'getLogos']);
+        Route::get('/reports-counts', [DashboardController::class,'reportsCounts'])->middleware('can:view-reports');
+        Route::get('/reports-list', [DashboardController::class,'reportsList'])->middleware('can:view-reports');
     });
 
     /*

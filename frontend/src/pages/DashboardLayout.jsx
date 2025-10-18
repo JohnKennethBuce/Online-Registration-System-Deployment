@@ -37,6 +37,9 @@ function DashboardNav() {
       {user.role?.permissions?.includes('scan-registration') && (
       <Link to="/dashboard/scanner" style={linkStyle}>QR Scanner</Link>
       )}
+
+      {user.role?.permissions?.includes('view-reports') &&
+      <Link to="/dashboard/reports" style={linkStyle}>Reports</Link>}
       
     </nav>
   );

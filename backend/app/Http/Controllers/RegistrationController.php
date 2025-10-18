@@ -39,6 +39,7 @@ class RegistrationController extends Controller
                 'address' => 'nullable|string|max:255',
                 'company_name' => 'nullable|string|max:255',
                 'registration_type' => 'required|in:onsite,online,pre-registered',
+                'payment_status' => 'nullable|in:unpaid,paid',
             ]);
 
             // Check for duplicate email hash
@@ -80,6 +81,7 @@ class RegistrationController extends Controller
                 'ticket_printed_status_id' => $ticketNotPrinted->id,
                 'ticket_number' => $ticketNumber,
                 'registered_by' => Auth::id(),
+                'payment_status' => $validated['payment_status'] ?? 'unpaid',
             ]);
 
             // ✅ Dispatch a job to handle QR code generation in the background
@@ -126,6 +128,7 @@ class RegistrationController extends Controller
                     'address' => 'nullable|string|max:255',
                     'company_name' => 'nullable|string|max:255',
                     'registration_type' => 'required|in:onsite,online,pre-registered',
+                    'payment_status' => 'nullable|in:unpaid,paid',
                 ]);
                 
                 // Update the email_hash if the email has changed
@@ -189,6 +192,7 @@ class RegistrationController extends Controller
                     'scanned_time' => now(),
                     'badge_printed_status_id' => $badgeQueued->id,
                     'ticket_printed_status_id' => $ticketQueued->id,
+                    'payment_status' => $registration->payment_status->id,
                 ]);
             
                 // --- Auto confirm if not already ---

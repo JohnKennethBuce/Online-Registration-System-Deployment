@@ -1762,8 +1762,11 @@ export default function ProtectedRoute({ children, roles }) {
 
 
 10 / 16 / 17 
-let's add another page Reports, First let's add more data needed in our DashboardController so we will display to new page report in our frontend 
 
+
+
+
+let's add another page Reports, First let's add more data needed in our DashboardController so we will display to new page report in our frontend 
 here's the Migrated Tables 
 
 <?php
@@ -1873,9 +1876,6 @@ Basically we need to display this tables so The report will be perfect just help
 also our RegistrationController Cause I just Recently add the payment_status 
 
 Frontend modification
-before we set up Reports We need to Update our Registration.jsx to add payment status dropdown too
-here's data we needed to display 
-
 
 Search bar for specific data report
 Printed counts 
@@ -2247,6 +2247,7 @@ class RegistrationController extends Controller
                 'address' => 'nullable|string|max:255',
                 'company_name' => 'nullable|string|max:255',
                 'registration_type' => 'required|in:onsite,online,pre-registered',
+                'payment_status' => 'nullable|in:unpaid,paid',
             ]);
 
             // Check for duplicate email hash
@@ -2288,6 +2289,7 @@ class RegistrationController extends Controller
                 'ticket_printed_status_id' => $ticketNotPrinted->id,
                 'ticket_number' => $ticketNumber,
                 'registered_by' => Auth::id(),
+                'payment_status' => $validated['payment_status'] ?? 'unpaid',
             ]);
 
             // ✅ Dispatch a job to handle QR code generation in the background
@@ -2334,6 +2336,7 @@ class RegistrationController extends Controller
                     'address' => 'nullable|string|max:255',
                     'company_name' => 'nullable|string|max:255',
                     'registration_type' => 'required|in:onsite,online,pre-registered',
+                    'payment_status' => 'nullable|in:unpaid,paid',
                 ]);
                 
                 // Update the email_hash if the email has changed
@@ -2397,6 +2400,7 @@ class RegistrationController extends Controller
                     'scanned_time' => now(),
                     'badge_printed_status_id' => $badgeQueued->id,
                     'ticket_printed_status_id' => $ticketQueued->id,
+                    'payment_status' => $registration->payment_status->id,
                 ]);
             
                 // --- Auto confirm if not already ---
@@ -2655,7 +2659,9 @@ class RegistrationController extends Controller
             return response()->json(['error' => 'Failed to print ticket after scan'], 500);
         }
     }
-}
+} 
+
+
 
 
 

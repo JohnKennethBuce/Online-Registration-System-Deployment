@@ -22,6 +22,7 @@ import RoleManagementPage from './pages/RoleManagementPage';
 import DashboardLayout from "./pages/DashboardLayout";
 import ScannerPage from './pages/ScannerPage';
 import BadgePrintPage from './pages/BadgePrintPage';
+import Reports from './pages/Reports';  
 
 // 🔹 NavBar Component
 function NavBar() {
@@ -99,6 +100,7 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="server-mode" element={<ServerModeManager />} />
             <Route path="scanner" element={<ScannerPage />} />
+            <Route path="reports" element={<Reports />} />
 
             {/* The old /admin and /superadmin pages can be removed or kept as needed */}
             <Route path="admin" element={<AdminPage />} />
