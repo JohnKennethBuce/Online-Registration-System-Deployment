@@ -1,42 +1,269 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* ============================================
+   ULTRA-MODERN NAVBAR STYLES
+   ============================================ */
+
+/* Navbar brand animation */
+.navbar-brand-modern:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.4));
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Modern nav links with hover effects */
+.nav-link-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 10px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
 }
 
-@keyframes logo-spin {
+.nav-link-modern:hover::before {
+  opacity: 1;
+}
+
+.nav-link-modern:hover {
+  transform: translateY(-2px);
+  color: #667eea !important;
+}
+
+.nav-link-modern.active {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+/* ============================================
+   DROPDOWN MODERN STYLES
+   ============================================ */
+
+/* Remove Bootstrap caret */
+.custom-dropdown-toggle::after {
+  display: none !important;
+}
+
+/* Dropdown toggle hover effect */
+.dropdown-toggle-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3) !important;
+}
+
+.dropdown-toggle-modern:hover .dropdown-bg-effect {
+  opacity: 1 !important;
+}
+
+.dropdown-toggle-modern:hover {
+  color: white !important;
+  border-color: transparent !important;
+}
+
+.dropdown-toggle-modern:hover .dropdown-arrow {
+  transform: rotate(180deg);
+  color: white;
+}
+
+/* Dropdown menu animation */
+.dropdown-menu-modern {
+  animation: dropdownSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+@keyframes dropdownSlideIn {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+/* Dropdown item hover with slide and background */
+.dropdown-item-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border-radius: 10px;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: -1;
+}
+
+.dropdown-item-modern:hover::before {
+  opacity: 1;
+  transform: translateX(5px);
+}
+
+.dropdown-item-modern:hover {
+  background-color: transparent !important;
+  transform: translateX(5px);
+  color: #667eea !important;
+}
+
+.dropdown-item-modern:hover span:first-child {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white;
+  transform: scale(1.1) rotate(5deg);
+}
+
+/* Logout item special hover */
+.dropdown-item-danger::before {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.08) 0%, rgba(220, 53, 69, 0.12) 100%) !important;
+}
+
+.dropdown-item-danger:hover {
+  color: #dc3545 !important;
+}
+
+.dropdown-item-danger:hover span:first-child {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+  color: white;
+  transform: scale(1.1) rotate(-5deg);
+}
+
+/* ============================================
+   LOGIN BUTTON MODERN STYLES
+   ============================================ */
+
+.login-button-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.login-button-modern:hover::before {
+  left: 100%;
+}
+
+.login-button-modern:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5) !important;
+}
+
+.login-button-modern:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* ============================================
+   NAVBAR GLASS EFFECT
+   ============================================ */
+
+.navbar-modern {
+  position: relative;
+}
+
+.navbar-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, 
+    rgba(102, 126, 234, 0.02) 0%, 
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.shadow-smooth {
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 10px 40px rgba(102, 126, 234, 0.08) !important;
+}
+
+/* ============================================
+   DROPDOWN SHADOW ENHANCEMENT
+   ============================================ */
+
+.dropdown-modern.show .dropdown-toggle-modern {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3) !important;
+}
+
+.dropdown-modern.show .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+/* ============================================
+   SMOOTH TRANSITIONS FOR ALL INTERACTIVE ELEMENTS
+   ============================================ */
+
+.nav-link-modern,
+.dropdown-toggle-modern,
+.dropdown-item-modern,
+.login-button-modern {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 991px) {
+  .navbar-brand-modern {
+    font-size: 1.25rem;
+  }
+  
+  .nav-link-modern,
+  .dropdown-toggle-modern {
+    width: 100%;
+    justify-content: flex-start;
+    margin-bottom: 0.5rem;
+  }
+  
+  .dropdown-modern {
+    width: 100%;
+    margin-left: 0 !important;
+    margin-top: 0.5rem;
   }
 }
 
-.card {
-  padding: 2em;
+/* ============================================
+   FOCUS STATES FOR ACCESSIBILITY
+   ============================================ */
+
+.nav-link-modern:focus,
+.dropdown-toggle-modern:focus,
+.dropdown-item-modern:focus,
+.login-button-modern:focus {
+  outline: 2px solid rgba(102, 126, 234, 0.5);
+  outline-offset: 2px;
 }
 
-.read-the-docs {
-  color: #888;
+/* ============================================
+   ANIMATED GRADIENT BACKGROUND
+   ============================================ */
+
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.dropdown-toggle-modern {
+  background-size: 200% 200%;
+}
+
+.dropdown-toggle-modern:hover {
+  animation: gradientMove 3s ease infinite;
 }

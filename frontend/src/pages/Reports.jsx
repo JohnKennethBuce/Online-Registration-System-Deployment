@@ -1,26 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Table, Form, Button, Container, Row, Col, ListGroup } from 'react-bootstrap';
+import { Table, Form, Button, Container, Row, Col, ListGroup, InputGroup, Spinner, Badge } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
-
-// ✅ CORRECT imports for jsPDF v3.x and autotable v5.x
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const Reports = () => {
   const [counts, setCounts] = useState({ printed: 0, reprinted: 0, paid: 0, unpaid: 0, total: 0 });
-  const [registrations, setRegistrations] = useState([]);
+  const [allRegistrations, setAllRegistrations] = useState([]); // ✅ All loaded data
+  const [filteredRegistrations, setFilteredRegistrations] = useState([]); // ✅ Filtered results
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(50);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
 
+  // ✅ Load all data once on mount
   useEffect(() => {
     fetchCounts();
-    fetchList();
-  }, [search, page]);
+    fetchAllData();
+  }, []);
+
+  // ✅ Filter data whenever search term changes
+  useEffect(() => {
+    filterData();
+    setCurrentPage(1); // Reset to first page when search changes
+  }, [search, allRegistrations]);
 
   const fetchCounts = async () => {
     try {
@@ -34,97 +40,146 @@ const Reports = () => {
     }
   };
 
-  const fetchList = async () => {
+  const fetchAllData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const params = { search, page, per_page: 50 };
-      const res = await api.get('/dashboard/reports-list', { params });
+      // ✅ Load ALL data at once
+      const res = await api.get('/dashboard/reports-list', { 
+        params: { all: true } 
+      });
       
-      console.log('✅ Reports list:', res.data);
+      const data = res.data.data || [];
+      console.log('✅ Loaded all registrations:', data.length);
       
-      setRegistrations(res.data.data || []);
-      setTotalPages(res.data.last_page || 1);
+      setAllRegistrations(data);
+      setFilteredRegistrations(data); // Initially show all
     } catch (err) {
-      console.error('❌ Error fetching list:', err);
+      console.error('❌ Error fetching data:', err);
       setError(err.response?.data?.message || 'Failed to fetch registrations');
+      setAllRegistrations([]);
+      setFilteredRegistrations([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (e) => {
-    setSearch(e.target.value);
-    setPage(1);
+  // ✅ Client-side filtering
+  const filterData = () => {
+    if (!search.trim()) {
+      setFilteredRegistrations(allRegistrations);
+      return;
+    }
+
+    const searchLower = search.toLowerCase().trim();
+    
+    const filtered = allRegistrations.filter(reg => {
+      // Search in multiple fields
+      const firstName = (reg.first_name || '').toLowerCase();
+      const lastName = (reg.last_name || '').toLowerCase();
+      const fullName = `${firstName} ${lastName}`;
+      const email = (reg.email || '').toLowerCase();
+      const phone = (reg.phone || '').toLowerCase();
+      const ticketNumber = (reg.ticket_number || '').toLowerCase();
+      const companyName = (reg.company_name || '').toLowerCase();
+      const registrationType = (reg.registration_type || '').toLowerCase();
+      const paymentStatus = (reg.payment_status || '').toLowerCase();
+      
+      return firstName.includes(searchLower)
+        || lastName.includes(searchLower)
+        || fullName.includes(searchLower)
+        || email.includes(searchLower)
+        || phone.includes(searchLower)
+        || ticketNumber.includes(searchLower)
+        || companyName.includes(searchLower)
+        || registrationType.includes(searchLower)
+        || paymentStatus.includes(searchLower);
+    });
+
+    console.log(`🔍 Search "${search}": ${filtered.length} results from ${allRegistrations.length} total`);
+    setFilteredRegistrations(filtered);
   };
 
-  // ✅ FIXED PDF Export for jsPDF v3.0.3 and autotable v5.0.2
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+  };
+
+  const handleClearSearch = () => {
+    setSearch('');
+  };
+
+  const handleRefresh = () => {
+    fetchAllData();
+    fetchCounts();
+  };
+
+  // ✅ Pagination calculations (client-side)
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = filteredRegistrations.slice(indexOfFirstRecord, indexOfLastRecord);
+  const totalPages = Math.ceil(filteredRegistrations.length / recordsPerPage);
+
+  // ✅ PDF Export (uses filtered data)
   const exportToPDF = async () => {
     try {
       setExporting(true);
       console.log('🚀 Starting PDF export...');
       
-      // Fetch all data
-      const res = await api.get('/dashboard/reports-list', { 
-        params: { search, all: true } 
-      });
+      const dataToExport = filteredRegistrations;
       
-      const allData = res.data.data || [];
-      console.log('📊 Data fetched:', allData.length, 'records');
-      
-      if (allData.length === 0) {
+      if (dataToExport.length === 0) {
         alert('No data to export');
         setExporting(false);
         return;
       }
 
-      // ✅ Create PDF - correct syntax for v3.x
       const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
       });
       
-      console.log('📄 PDF document created');
-      
       // Header
       doc.setFontSize(20);
       doc.setTextColor(0, 123, 255);
-      doc.text('Registration Reports', 14, 15);
+      doc.text('📊 Registration Reports', 14, 15);
       
       // Date
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
       
+      // Search filter note
+      if (search) {
+        doc.setFontSize(9);
+        doc.setTextColor(255, 0, 0);
+        doc.text(`Filtered by: "${search}"`, 14, 27);
+      }
+      
       // Summary section
       doc.setFontSize(11);
       doc.setTextColor(0, 0, 0);
-      const summaryY = 28;
+      const summaryY = search ? 32 : 28;
       doc.text('Summary:', 14, summaryY);
       
       doc.setFontSize(9);
-      doc.text(`Printed Counts: ${counts.printed}`, 14, summaryY + 5);
-      doc.text(`Re-Printed Counts: ${counts.reprinted}`, 60, summaryY + 5);
-      doc.text(`Paid Counts: ${counts.paid}`, 106, summaryY + 5);
-      doc.text(`Unpaid Counts: ${counts.unpaid}`, 152, summaryY + 5);
-      doc.text(`Total Registrants: ${counts.total}`, 198, summaryY + 5);
+      doc.text(`✅ Printed: ${counts.printed}`, 14, summaryY + 5);
+      doc.text(`🔄 Reprinted: ${counts.reprinted}`, 60, summaryY + 5);
+      doc.text(`💰 Paid: ${counts.paid}`, 106, summaryY + 5);
+      doc.text(`❌ Unpaid: ${counts.unpaid}`, 152, summaryY + 5);
+      doc.text(`👥 Total: ${counts.total}`, 198, summaryY + 5);
       
-      // Separator line
+      if (search) {
+        doc.text(`🔍 Showing: ${dataToExport.length} filtered records`, 14, summaryY + 10);
+      }
+      
+      // Separator
       doc.setDrawColor(200, 200, 200);
-      doc.line(14, summaryY + 8, 283, summaryY + 8);
+      doc.line(14, summaryY + (search ? 13 : 8), 283, summaryY + (search ? 13 : 8));
       
-      // Notes section
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      doc.text('Notes: This report includes all registrations based on current filters and permissions.', 14, summaryY + 14);
-      
-      // Separator for notes
-      doc.line(14, summaryY + 18, 283, summaryY + 18);
-      
-      // Prepare table data
-      const tableData = allData.map(reg => [
+      // Table data
+      const tableData = dataToExport.map(reg => [
         String(reg.id || ''),
         `${reg.first_name || ''} ${reg.last_name || ''}`.trim(),
         reg.email || '',
@@ -137,11 +192,8 @@ const Reports = () => {
         new Date(reg.created_at).toLocaleDateString()
       ]);
 
-      console.log('📋 Table data prepared:', tableData.length, 'rows');
-
-      // ✅ CORRECT: Use autoTable function for v5.x (NOT doc.autoTable)
       autoTable(doc, {
-        startY: summaryY + 22,
+        startY: summaryY + (search ? 17 : 12),
         head: [['ID', 'Name', 'Email', 'Phone', 'Type', 'Payment', 'Badge', 'Ticket', 'By', 'Date']],
         body: tableData,
         theme: 'striped',
@@ -168,7 +220,6 @@ const Reports = () => {
           9: { cellWidth: 25, halign: 'center' }
         },
         didDrawPage: (data) => {
-          // Page numbers
           const pageCount = doc.getNumberOfPages();
           doc.setFontSize(8);
           doc.setTextColor(150);
@@ -179,53 +230,44 @@ const Reports = () => {
         }
       });
 
-      console.log('✅ Table added to PDF');
-
-      // Save PDF
       const filename = `registrations_report_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
       
       console.log('✅ PDF saved:', filename);
-      alert(`✅ PDF exported successfully!\nFile: ${filename}`);
+      alert(`✅ PDF exported successfully!\nRecords: ${dataToExport.length}\nFile: ${filename}`);
     } catch (err) {
       console.error('❌ PDF export error:', err);
-      console.error('Error stack:', err.stack);
       alert('Failed to export PDF: ' + err.message);
     } finally {
       setExporting(false);
     }
   };
 
-  // ✅ CSV Export with summary
+  // ✅ CSV Export (uses filtered data)
   const exportToCSV = async () => {
     try {
       setExporting(true);
       
-      const res = await api.get('/dashboard/reports-list', { 
-        params: { search, all: true } 
-      });
+      const dataToExport = filteredRegistrations;
       
-      const allData = res.data.data || [];
-      
-      if (allData.length === 0) {
+      if (dataToExport.length === 0) {
         alert('No data to export');
         setExporting(false);
         return;
       }
 
-      // Summary at top
       const summaryRows = [
-        ['Registration Reports'],
+        ['📊 Registration Reports'],
         [`Generated on: ${new Date().toLocaleString()}`],
+        ...(search ? [[`Filtered by: "${search}"`]] : []),
         [''],
         ['Summary Statistics'],
-        ['Printed Counts', counts.printed],
-        ['Re-Printed Counts', counts.reprinted],
-        ['Paid Counts', counts.paid],
-        ['Unpaid Counts', counts.unpaid],
-        ['Total Registrants', counts.total],
-        [''],
-        ['Notes: This report includes all registrations based on current filters and permissions.'],
+        ['✅ Printed Counts', counts.printed],
+        ['🔄 Re-Printed Counts', counts.reprinted],
+        ['💰 Paid Counts', counts.paid],
+        ['❌ Unpaid Counts', counts.unpaid],
+        ['👥 Total Registrants', counts.total],
+        ...(search ? [[`🔍 Filtered Records`, dataToExport.length]] : []),
         [''],
         ['Registration Details']
       ];
@@ -236,7 +278,7 @@ const Reports = () => {
         'Registered By', 'Created At'
       ];
 
-      const dataRows = allData.map(reg => [
+      const dataRows = dataToExport.map(reg => [
         reg.id,
         `"${reg.first_name || ''}"`,
         `"${reg.last_name || ''}"`,
@@ -258,8 +300,6 @@ const Reports = () => {
       ];
 
       const csvContent = csvRows.join('\n');
-
-      // Download
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -274,7 +314,7 @@ const Reports = () => {
       document.body.removeChild(link);
       
       console.log('✅ CSV exported successfully');
-      alert(`✅ CSV exported successfully!\nFile: ${filename}`);
+      alert(`✅ CSV exported successfully!\nRecords: ${dataToExport.length}\nFile: ${filename}`);
     } catch (err) {
       console.error('❌ CSV export error:', err);
       alert('Failed to export CSV: ' + err.message);
@@ -285,7 +325,19 @@ const Reports = () => {
 
   return (
     <Container className="mt-4">
-      <h2>📊 Reports</h2>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2>📊 Reports</h2>
+        <Button variant="outline-primary" size="sm" onClick={handleRefresh} disabled={loading}>
+          {loading ? (
+            <>
+              <Spinner animation="border" size="sm" className="me-1" />
+              Loading...
+            </>
+          ) : (
+            <>🔄 Refresh Data</>
+          )}
+        </Button>
+      </div>
       
       {error && (
         <div className="alert alert-danger alert-dismissible fade show" role="alert">
@@ -322,46 +374,94 @@ const Reports = () => {
 
           <div className="mt-4">
             <h5 className="mb-2">📥 Export Options</h5>
+            {search && (
+              <div className="alert alert-info py-2 px-3 mb-2">
+                <small>
+                  <strong>Filter active:</strong> "{search}"
+                  <br />
+                  Export will include {filteredRegistrations.length} filtered record(s)
+                </small>
+              </div>
+            )}
             <div className="d-grid gap-2">
               <Button 
                 variant="danger" 
                 onClick={exportToPDF} 
-                disabled={exporting || loading || counts.total === 0}
+                disabled={exporting || filteredRegistrations.length === 0}
                 size="lg"
               >
-                {exporting ? '⏳ Generating PDF...' : '📄 Export to PDF'}
+                {exporting ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Generating PDF...
+                  </>
+                ) : (
+                  `📄 Export to PDF (${filteredRegistrations.length})`
+                )}
               </Button>
               <Button 
                 variant="success" 
                 onClick={exportToCSV} 
-                disabled={exporting || loading || counts.total === 0}
+                disabled={exporting || filteredRegistrations.length === 0}
               >
-                {exporting ? '⏳ Generating CSV...' : '📊 Export to CSV'}
+                {exporting ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Generating CSV...
+                  </>
+                ) : (
+                  `📊 Export to CSV (${filteredRegistrations.length})`
+                )}
               </Button>
             </div>
-            {counts.total === 0 && (
-              <small className="text-muted d-block mt-2">No data available to export</small>
+            {filteredRegistrations.length === 0 && (
+              <small className="text-muted d-block mt-2 text-center">
+                {search ? 'No matching records to export' : 'No data available'}
+              </small>
             )}
           </div>
         </Col>
 
         <Col md={8}>
-          <h4 className="mb-3">Registration List</h4>
-          <Form className="mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h4 className="mb-0">Registration List</h4>
+            <Badge bg="secondary">
+              {filteredRegistrations.length} of {allRegistrations.length} records
+            </Badge>
+          </div>
+          
+          {/* ✅ Instant Search Field */}
+          <InputGroup className="mb-3">
+            <InputGroup.Text>🔍</InputGroup.Text>
             <Form.Control 
               type="text" 
-              placeholder="🔍 Search by name, email, or ticket number" 
+              placeholder="Instant search: name, email, phone, ticket number..." 
               value={search} 
-              onChange={handleSearch} 
+              onChange={handleSearchChange}
+              disabled={loading}
             />
-          </Form>
+            {search && (
+              <Button 
+                variant="outline-secondary" 
+                onClick={handleClearSearch}
+              >
+                ✕
+              </Button>
+            )}
+          </InputGroup>
+
+          {search && (
+            <div className="alert alert-success py-2 px-3 mb-3">
+              <small>
+                ✅ Found <strong>{filteredRegistrations.length}</strong> result(s) for "<strong>{search}</strong>"
+              </small>
+            </div>
+          )}
 
           {loading ? (
             <div className="text-center p-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <p className="mt-2">Loading registrations...</p>
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-2">Loading all registrations...</p>
             </div>
           ) : (
             <>
@@ -382,8 +482,8 @@ const Reports = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {registrations.length > 0 ? (
-                      registrations.map((reg) => (
+                    {currentRecords.length > 0 ? (
+                      currentRecords.map((reg) => (
                         <tr key={reg.id}>
                           <td>{reg.id}</td>
                           <td>{reg.first_name} {reg.last_name}</td>
@@ -406,7 +506,22 @@ const Reports = () => {
                     ) : (
                       <tr>
                         <td colSpan="10" className="text-center text-muted py-4">
-                          {search ? '🔍 No registrations found matching your search' : '📭 No registrations yet'}
+                          {search ? (
+                            <>
+                              🔍 No registrations found matching "<strong>{search}</strong>"
+                              <br />
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                onClick={handleClearSearch}
+                                className="mt-2"
+                              >
+                                Clear search and show all
+                              </Button>
+                            </>
+                          ) : (
+                            '📭 No registrations yet'
+                          )}
                         </td>
                       </tr>
                     )}
@@ -419,20 +534,22 @@ const Reports = () => {
                   <Button 
                     variant="outline-secondary" 
                     size="sm"
-                    disabled={page === 1} 
-                    onClick={() => setPage(page - 1)}
+                    disabled={currentPage === 1} 
+                    onClick={() => setCurrentPage(currentPage - 1)}
                   >
                     ← Previous
                   </Button>
                   <span className="text-muted">
-                    Page <strong>{page}</strong> of <strong>{totalPages}</strong>
-                    <small className="ms-2">({registrations.length} records)</small>
+                    Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+                    <small className="ms-2">
+                      (Showing {indexOfFirstRecord + 1}-{Math.min(indexOfLastRecord, filteredRegistrations.length)} of {filteredRegistrations.length})
+                    </small>
                   </span>
                   <Button 
                     variant="outline-secondary" 
                     size="sm"
-                    disabled={page === totalPages} 
-                    onClick={() => setPage(page + 1)}
+                    disabled={currentPage === totalPages} 
+                    onClick={() => setCurrentPage(currentPage + 1)}
                   >
                     Next →
                   </Button>
