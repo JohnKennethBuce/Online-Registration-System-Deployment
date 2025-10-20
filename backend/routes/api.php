@@ -34,6 +34,11 @@ Route::post('/registrations', [RegistrationController::class, 'store'])
     ->name('registrations.store')
     ->middleware('throttle:10,1');
 
+// 🎟️ Pre-registration verification (NEW - ADD THIS)
+Route::get('/verify-registration/{code}', [RegistrationController::class, 'verifyPreRegistration'])
+    ->name('registrations.verify')
+    ->middleware('throttle:20,1');
+
 // 🟢 Public server mode status (read-only)
 Route::get('/server-mode/status', [ServerModeController::class, 'getCurrentMode']);
 Route::get('/server-mode', [ServerModeController::class, 'getCurrentMode']); // alias

@@ -31,6 +31,25 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
+  // ✅ Format registration type for display
+  const formatRegistrationType = (type) => {
+    if (!type) return 'Unknown';
+    // Convert pre-registered to Pre-Registered, onsite to Onsite, online to Online
+    return type.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join('-');
+  };
+
+  // ✅ Get color for registration type
+  const getTypeColor = (type) => {
+    switch (type) {
+      case 'onsite': return '#007bff';
+      case 'online': return '#17a2b8';
+      case 'pre-registered': return '#6c757d';
+      default: return '#343a40';
+    }
+  };
+
   if (loading) return <div style={{ padding: "20px" }}>⏳ Loading dashboard...</div>;
   if (error) return <div style={{ padding: "20px", color: "red" }}>❌ {error}</div>;
   if (!summary) return <div style={{ padding: "20px" }}>No data available</div>;
@@ -39,7 +58,7 @@ export default function Dashboard() {
     <div style={{ padding: "20px" }}>
       <h2>📊 Dashboard</h2>
 
-      {/* Reports Counts Section - NEW */}
+      {/* Reports Counts Section - Including Not Printed */}
       {reportsCounts && (
         <section style={{ 
           marginBottom: "30px", 
@@ -54,6 +73,10 @@ export default function Dashboard() {
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
             gap: "15px" 
           }}>
+            <div style={{ padding: "15px", backgroundColor: "#fff", borderRadius: "5px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
+              <div style={{ fontSize: "14px", color: "#6c757d", marginBottom: "5px" }}>📄 Not Printed</div>
+              <div style={{ fontSize: "28px", fontWeight: "bold", color: "#6c757d" }}>{reportsCounts.not_printed || 0}</div>
+            </div>
             <div style={{ padding: "15px", backgroundColor: "#fff", borderRadius: "5px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
               <div style={{ fontSize: "14px", color: "#6c757d", marginBottom: "5px" }}>✅ Printed Badges</div>
               <div style={{ fontSize: "28px", fontWeight: "bold", color: "#28a745" }}>{reportsCounts.printed}</div>
@@ -92,7 +115,7 @@ export default function Dashboard() {
         </p>
       </section>
 
-      {/* Registrations by Type */}
+      {/* Registrations by Type - Updated to handle Pre-Registered */}
       <section style={{ marginBottom: "20px" }}>
         <h3>📝 Registrations by Type</h3>
         {summary.registrations_by_type && summary.registrations_by_type.length > 0 ? (
@@ -103,9 +126,9 @@ export default function Dashboard() {
                 marginBottom: "8px", 
                 backgroundColor: "#f8f9fa", 
                 borderRadius: "5px",
-                borderLeft: "4px solid #007bff"
+                borderLeft: `4px solid ${getTypeColor(item.registration_type)}`
               }}>
-                <span style={{ textTransform: "capitalize" }}>{item.registration_type}</span>: <strong>{item.total}</strong>
+                <span>{formatRegistrationType(item.registration_type)}</span>: <strong>{item.total}</strong>
               </li>
             ))}
           </ul>

@@ -34,44 +34,51 @@ class RegistrationController extends Controller
             $validated = $request->validate([
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'required|string|max:255',
-                'email' => 'required|email|max:255|unique:registrations,email',
+                'email' => 'nullable|email|max:255|unique:registrations,email',
                 'phone' => 'nullable|string|max:20',
                 'address' => 'nullable|string|max:255',
                 'company_name' => 'nullable|string|max:255',
                 'registration_type' => 'required|in:onsite,online,pre-registered',
                 'payment_status' => 'nullable|in:unpaid,paid',
             ]);
-
-            // Check for duplicate email hash
-            $emailHash = hash('sha256', strtolower(trim($validated['email'])));
-            if (Registration::where('email_hash', $emailHash)->exists()) {
-                return response()->json(['error' => 'This email address is already registered.'], 409);
+        
+            // Check for duplicate email hash (only if email is provided)
+            $emailHash = null;
+            if (!empty($validated['email'])) {
+                $emailHash = hash('sha256', strtolower(trim($validated['email'])));
+                if (Registration::where('email_hash', $emailHash)->exists()) {
+                    return response()->json(['error' => 'This email address is already registered.'], 409);
+                }
             }
-
-            // ServerMode validation
+        
+            // Get current server mode (needed for registration record)
             $serverMode = ServerMode::latest()->first();
             if (!$serverMode) {
                 return response()->json(['error' => 'Server mode not configured.'], 500);
             }
-            $allowedTypes = explode(',', str_replace('both', 'onsite,online', $serverMode->mode));
-            if (!in_array($validated['registration_type'], $allowedTypes)) {
-                return response()->json(['error' => 'Registration type not allowed in current mode'], 400);
+        
+            // ServerMode validation - Skip for pre-registered ✅ CORRECT!
+            if ($validated['registration_type'] !== 'pre-registered') {
+                $allowedTypes = explode(',', str_replace('both', 'onsite,online', $serverMode->mode));
+                if (!in_array($validated['registration_type'], $allowedTypes)) {
+                    return response()->json(['error' => 'Registration type not allowed in current mode'], 400);
+                }
             }
-
+        
             // PrintStatus setup
             $badgeNotPrinted = PrintStatus::where('type', 'badge')->where('name', 'not_printed')->first();
             $ticketNotPrinted = PrintStatus::where('type', 'ticket')->where('name', 'not_printed')->first();
             if (!$badgeNotPrinted || !$ticketNotPrinted) {
                 return response()->json(['error' => 'Print statuses not configured.'], 500);
             }
-
-            // Create Registration first
+        
+            // Create Registration
             $ticketNumber = 'TICKET-' . strtoupper(Str::random(12));
             $registration = Registration::create([
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
                 'email' => $validated['email'],
-                'email_hash' => $emailHash,
+                'email_hash' => $emailHash, // Will be null if no email provided
                 'phone' => $validated['phone'],
                 'address' => $validated['address'],
                 'company_name' => $validated['company_name'],
@@ -83,15 +90,15 @@ class RegistrationController extends Controller
                 'registered_by' => Auth::id(),
                 'payment_status' => $validated['payment_status'] ?? 'unpaid',
             ]);
-
-            // ✅ Dispatch a job to handle QR code generation in the background
-           (new GenerateQrCode($registration))->handle();
-
-
+        
+            // Dispatch QR code generation job
+            (new GenerateQrCode($registration))->handle();
+        
             Log::info('Registration created and QR job dispatched', [
                 'ticket_number' => $ticketNumber,
                 'user_id' => Auth::id(),
-                'mode' => $serverMode->mode
+                'mode' => $serverMode->mode,
+                'type' => $validated['registration_type']
             ]);
             
             $fresh = $registration->fresh();
@@ -118,30 +125,35 @@ class RegistrationController extends Controller
                 ]);
             }
 
-        public function update(Request $request, Registration $registration)
+       public function update(Request $request, Registration $registration)
             {
                 $validated = $request->validate([
                     'first_name' => 'required|string|max:255',
                     'last_name' => 'required|string|max:255',
-                    'email' => ['required', 'email', 'max:255', Rule::unique('registrations')->ignore($registration->id)],
+                    'email' => ['nullable', 'email', 'max:255', Rule::unique('registrations')->ignore($registration->id)],
                     'phone' => 'nullable|string|max:20',
                     'address' => 'nullable|string|max:255',
                     'company_name' => 'nullable|string|max:255',
                     'registration_type' => 'required|in:onsite,online,pre-registered',
                     'payment_status' => 'nullable|in:unpaid,paid',
                 ]);
-                
+
                 // Update the email_hash if the email has changed
                 if ($registration->email !== $validated['email']) {
-                    $validated['email_hash'] = hash('sha256', strtolower(trim($validated['email'])));
+                    // This logic ensures that if the email is cleared, the hash becomes null.
+                    if (!empty($validated['email'])) {
+                        $validated['email_hash'] = hash('sha256', strtolower(trim($validated['email'])));
+                    } else {
+                        $validated['email_hash'] = null;
+                    }
                 }
-                
+
                 // The model's accessors/mutators will handle encryption automatically
                 $registration->update($validated);
-                
+
                 return response()->json($registration->fresh());
             }
-
+            
         /**
          * Delete a registration.
          */
@@ -151,107 +163,109 @@ class RegistrationController extends Controller
             
                 return response()->json(null, 204); // 204 No Content success response
             }
-        public function scan(Request $request, ?string $ticket_number = null): JsonResponse
-            {
-                // Accept from route param or request body
-                $ticket = $ticket_number ?: $request->input('ticket_number');
-                if (!$ticket) {
-                    return response()->json(['error' => 'ticket_number is required'], 422);
-                }
-            
-                $registration = Registration::where('ticket_number', $ticket)->firstOrFail();
-                $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
-            
-                if ($registration->server_mode !== $currentMode && $currentMode !== 'both') {
-                    return response()->json(['error' => 'Scan not allowed in current mode'], 403);
-                }
-            
-                // Superadmin can reprint unlimited
-                $isSuperAdmin = optional($request->user()->role)->name === 'superadmin';
-            
-                // --- Statuses ---
-                $badgeQueued     = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
-                $badgePrinting   = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
-                $badgePrinted    = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
-                $badgeReprinted  = PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
-            
-                $ticketQueued    = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
-                $ticketPrinting  = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
-                $ticketPrinted   = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
-                $ticketReprinted = PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
-            
-                if (!$badgeQueued || !$badgePrinting || !$badgePrinted || !$badgeReprinted ||
-                    !$ticketQueued || !$ticketPrinting || !$ticketPrinted || !$ticketReprinted) {
-                    return response()->json(['error' => 'Print statuses not configured'], 400);
-                }
-            
-                // --- Create scan log ---
-                $scan = Scan::create([
-                    'registration_id' => $registration->id,
-                    'scanned_by' => Auth::id(),
-                    'scanned_time' => now(),
-                    'badge_printed_status_id' => $badgeQueued->id,
-                    'ticket_printed_status_id' => $ticketQueued->id,
-                    'payment_status' => $registration->payment_status,
-                ]);
-            
-                // --- Auto confirm if not already ---
-                if (!$registration->confirmed) {
-                    $registration->update([
-                        'confirmed' => true,
-                        'confirmed_by' => Auth::id(),
-                        'confirmed_at' => now(),
-                    ]);
-                }
-            
-                // --- Badge flow with one-time reprint limit (superadmin bypass) ---
-                $badgeStatusId = $registration->badge_printed_status_id;
-                if ($badgeStatusId === $badgeReprinted->id) {
-                    if (!$isSuperAdmin) {
-                        return response()->json(['error' => 'Badge already reprinted once. Reprint limit reached.'], 409);
-                    }
-                    // superadmin: allow additional prints; keep status as "reprinted"
-                    // no change needed
-                } elseif ($badgeStatusId === $badgePrinted->id) {
-                    // printed → reprinted
-                    $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
-                } else {
-                    // not_printed (or other) → queue → printing → printed
-                    $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
-                    $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
-                    $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
-                }
-            
-                // --- Ticket flow (mirror; optional to enforce limit the same way) ---
-                $ticketStatusId = $registration->ticket_printed_status_id;
-                if ($ticketStatusId === $ticketReprinted->id) {
-                    if ($isSuperAdmin) {
-                        // allow; keep as reprinted
-                    } else {
-                        // If you want the same strict limit for tickets, uncomment:
-                        // return response()->json(['error' => 'Ticket already reprinted once. Reprint limit reached.'], 409);
-                    }
-                } elseif ($ticketStatusId === $ticketPrinted->id) {
-                    $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
-                } else {
-                    $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
-                    $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
-                    $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
-                }
-            
-                Log::info('Registration scanned; statuses updated', [
-                    'ticket_number' => $ticket,
-                    'user_id' => Auth::id(),
-                    'mode' => $currentMode,
-                    'superadmin_bypass' => $isSuperAdmin,
-                ]);
-            
-                return response()->json([
-                    'message' => 'Scanned. Print statuses updated (printed/reprinted).',
-                    'scan' => $scan,
-                    'registration' => $registration->fresh(),
-                ], 200);
+    public function scan(Request $request, ?string $ticket_number = null): JsonResponse
+        {
+            // Accept from route param or request body
+            $ticket = $ticket_number ?: $request->input('ticket_number');
+            if (!$ticket) {
+                return response()->json(['error' => 'ticket_number is required'], 422);
             }
+        
+            $registration = Registration::where('ticket_number', $ticket)->firstOrFail();
+            $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
+        
+            if ($registration->server_mode !== $currentMode && $currentMode !== 'both') {
+                return response()->json(['error' => 'Scan not allowed in current mode'], 403);
+            }
+        
+            // ✅ RE-INTRODUCE THIS SPECIFIC CHECK for the unlimited reprint permission
+            $user = $request->user();
+            $isSuperAdmin = $user->role->name === 'superadmin';
+        
+            // --- Statuses ---
+            $badgeQueued     = PrintStatus::where('type', 'badge')->where('name', 'queued')->first();
+            $badgePrinting   = PrintStatus::where('type', 'badge')->where('name', 'printing')->first();
+            $badgePrinted    = PrintStatus::where('type', 'badge')->where('name', 'printed')->first();
+            $badgeReprinted  = PrintStatus::where('type', 'badge')->where('name', 'reprinted')->first();
+        
+            $ticketQueued    = PrintStatus::where('type', 'ticket')->where('name', 'queued')->first();
+            $ticketPrinting  = PrintStatus::where('type', 'ticket')->where('name', 'printing')->first();
+            $ticketPrinted   = PrintStatus::where('type', 'ticket')->where('name', 'printed')->first();
+            $ticketReprinted = PrintStatus::where('type', 'ticket')->where('name', 'reprinted')->first();
+        
+            if (!$badgeQueued || !$badgePrinting || !$badgePrinted || !$badgeReprinted ||
+                !$ticketQueued || !$ticketPrinting || !$ticketPrinted || !$ticketReprinted) {
+                return response()->json(['error' => 'Print statuses not configured'], 400);
+            }
+        
+            // --- Create scan log ---
+            $scan = Scan::create([
+                'registration_id' => $registration->id,
+                'scanned_by' => Auth::id(),
+                'scanned_time' => now(),
+                'badge_printed_status_id' => $badgeQueued->id,
+                'ticket_printed_status_id' => $ticketQueued->id,
+                'payment_status' => $registration->payment_status,
+            ]);
+        
+            // --- Auto confirm if not already ---
+            if (!$registration->confirmed) {
+                $registration->update([
+                    'confirmed' => true,
+                    'confirmed_by' => Auth::id(),
+                    'confirmed_at' => now(),
+                ]);
+            }
+        
+            // --- Badge flow with one-time reprint limit (superadmin bypass) ---
+            $badgeStatusId = $registration->badge_printed_status_id;
+            if ($badgeStatusId === $badgeReprinted->id) {
+            
+                // ✅ THE FIX: The reprint limit is bypassed ONLY if the user is a superadmin.
+                // This will now correctly block an Admin user who tries to reprint more than once.
+                if (!$isSuperAdmin) {
+                    return response()->json(['error' => 'Badge already reprinted once. Reprint limit reached.'], 409);
+                }
+                // Superadmin can proceed without status change.
+            
+            } elseif ($badgeStatusId === $badgePrinted->id) {
+                // printed → reprinted (This is the first and ONLY reprint for a normal Admin)
+                $registration->update(['badge_printed_status_id' => $badgeReprinted->id]);
+            } else {
+                // not_printed (or other) → queue → printing → printed
+                $registration->update(['badge_printed_status_id' => $badgeQueued->id]);
+                $registration->update(['badge_printed_status_id' => $badgePrinting->id]);
+                $registration->update(['badge_printed_status_id' => $badgePrinted->id]);
+            }
+        
+            // --- Ticket flow (apply same specific logic) ---
+            $ticketStatusId = $registration->ticket_printed_status_id;
+            if ($ticketStatusId === $ticketReprinted->id) {
+                if (!$isSuperAdmin) {
+                    // Optional: enforce same limit for tickets if desired
+                    // return response()->json(['error' => 'Ticket already reprinted once.'], 409);
+                }
+            } elseif ($ticketStatusId === $ticketPrinted->id) {
+                $registration->update(['ticket_printed_status_id' => $ticketReprinted->id]);
+            } else {
+                $registration->update(['ticket_printed_status_id' => $ticketQueued->id]);
+                $registration->update(['ticket_printed_status_id' => $ticketPrinting->id]);
+                $registration->update(['ticket_printed_status_id' => $ticketPrinted->id]);
+            }
+        
+            Log::info('Registration scanned; statuses updated', [
+                'ticket_number' => $ticket,
+                'user_id' => Auth::id(),
+                'mode' => $currentMode,
+                'is_superadmin_reprint' => $isSuperAdmin,
+            ]);
+        
+            return response()->json([
+                'message' => 'Scanned. Print statuses updated (printed/reprinted).',
+                'scan' => $scan,
+                'registration' => $registration->fresh(),
+            ], 200);
+        }
 
             public function printBadge($ticketNumber): JsonResponse
             {
@@ -452,5 +466,66 @@ class RegistrationController extends Controller
         }
         
     }
+
+            /**
+         * Verify pre-registration by ticket number
+         * Used to auto-fill form for pre-registered attendees
+         */
+        public function verifyPreRegistration(string $code): JsonResponse
+        {
+            try {
+                // Look up by ticket_number (since that's your unique identifier)
+                $registration = Registration::where('ticket_number', $code)
+                    ->where('registration_type', 'pre-registered')
+                    ->first();
+                
+                if (!$registration) {
+                    return response()->json([
+                        'valid' => false,
+                        'error' => 'Invalid or non-existent pre-registration code'
+                    ], 404);
+                }
+                
+                // Check if already confirmed/checked-in
+                if ($registration->confirmed) {
+                    return response()->json([
+                        'valid' => true,
+                        'already_confirmed' => true,
+                        'message' => 'This registration has already been checked in',
+                        'confirmed_at' => $registration->confirmed_at,
+                        'first_name' => $registration->first_name,
+                        'last_name' => $registration->last_name,
+                    ], 200);
+                }
+                
+                Log::info('Pre-registration verified', [
+                    'ticket_number' => $code,
+                    'registration_id' => $registration->id
+                ]);
+                
+                return response()->json([
+                    'valid' => true,
+                    'already_confirmed' => false,
+                    'first_name' => $registration->first_name,
+                    'last_name' => $registration->last_name,
+                    'email' => $registration->email,
+                    'phone' => $registration->phone,
+                    'company_name' => $registration->company_name,
+                    'payment_status' => $registration->payment_status,
+                    'ticket_number' => $registration->ticket_number,
+                ], 200);
+                
+            } catch (\Exception $e) {
+                Log::error('Pre-registration verification error', [
+                    'code' => $code,
+                    'error' => $e->getMessage()
+                ]);
+                
+                return response()->json([
+                    'valid' => false,
+                    'error' => 'Verification failed. Please try again.'
+                ], 500);
+            }
+        }
     
 }

@@ -21,7 +21,21 @@ export default function LoginForm() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
+      let errorMessage = 'An error occurred. Please try again.';
+      
+      if (err.response) {
+        if (err.response.status === 422 && err.response.data.errors) {
+          // Validation errors
+          errorMessage = Object.values(err.response.data.errors)
+            .flat()
+            .join(' ');
+        } else if (err.response.data.message) {
+          // Auth error or other message
+          errorMessage = err.response.data.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

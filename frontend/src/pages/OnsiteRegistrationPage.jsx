@@ -192,13 +192,13 @@ export default function OnsiteRegistrationPage() {
             <input name="first_name" value={form.first_name} onChange={handleChange} placeholder="First Name" required style={{...styles.input, flex: '1 1 calc(50% - 8px)'}} />
             <input name="last_name" value={form.last_name} onChange={handleChange} placeholder="Last Name" required style={{...styles.input, flex: '1 1 calc(50% - 8px)'}} />
           </div>
-          <input name="email" value={form.email} onChange={handleChange} placeholder="Email Address" type="email" required style={styles.input} />
+          <input name="email" value={form.email} onChange={handleChange} placeholder="Email Address (Optional)" type="email" style={styles.input} />
           <input name="company_name" value={form.company_name} onChange={handleChange} placeholder="Company Name (Optional)" style={styles.input} />
           <div style={styles.inputGroup}>
             <input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone (Optional)" style={{...styles.input, flex: '1 1 calc(50% - 8px)'}} />
             <input name="address" value={form.address} onChange={handleChange} placeholder="Address (Optional)" style={{...styles.input, flex: '1 1 calc(50% - 8px)'}} />
           </div>
-          
+        
           <button
             type="submit"
             disabled={isSubmitting}

@@ -30,6 +30,8 @@ class RolesSeeder extends Seeder
                     Permission::CREATE_REGISTRATION->value,
                     Permission::EDIT_REGISTRATION->value,
                     Permission::SCAN_REGISTRATION->value,
+                    Permission::VIEW_SETTINGS->value,
+                    Permission::VIEW_REPORTS->value,
                     // Note: We are intentionally NOT giving them delete permissions by default.
                 ],
             ]

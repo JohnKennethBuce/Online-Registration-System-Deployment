@@ -20,7 +20,7 @@ class SuperAdminSeeder extends Seeder
         }
 
         $email = env('SUPERADMIN_EMAIL', 'superadmin@dev.com');
-        $password = env('SUPERADMIN_PASSWORD', 'password123');
+        $password = env('SUPERADMIN_PASSWORD', 'super@dmin123');
 
         $exists = User::where('email', $email)->first();
 

@@ -56,17 +56,11 @@ export function AuthProvider({ children }) {
 
   // 🔹 Login
   const login = async (email, password) => {
-    try {
-      const { data } = await api.post("/auth/login", { email, password });
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      return true;
-    } catch (err) {
-      console.error("Login failed", err);
-      return false;
-    }
+    const { data } = await api.post("/auth/login", { email, password });
+    setToken(data.token);
+    setUser(data.user);
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
   };
 
   return (

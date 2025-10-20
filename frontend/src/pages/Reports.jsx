@@ -6,7 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const Reports = () => {
-  const [counts, setCounts] = useState({ printed: 0, reprinted: 0, paid: 0, unpaid: 0, total: 0 });
+  const [counts, setCounts] = useState({not_printed: 0, printed: 0, reprinted: 0, paid: 0, unpaid: 0, total: 0 });
   const [allRegistrations, setAllRegistrations] = useState([]); // ✅ All loaded data
   const [filteredRegistrations, setFilteredRegistrations] = useState([]); // ✅ Filtered results
   const [search, setSearch] = useState('');
@@ -44,7 +44,7 @@ const Reports = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // ✅ Load ALL data at once
       const res = await api.get('/dashboard/reports-list', { 
         params: { all: true } 
@@ -65,7 +65,7 @@ const Reports = () => {
     }
   };
 
-  // ✅ Client-side filtering
+  // ✅ Client-side filtering (includes pre-registered)
   const filterData = () => {
     if (!search.trim()) {
       setFilteredRegistrations(allRegistrations);
@@ -73,7 +73,7 @@ const Reports = () => {
     }
 
     const searchLower = search.toLowerCase().trim();
-    
+
     const filtered = allRegistrations.filter(reg => {
       // Search in multiple fields
       const firstName = (reg.first_name || '').toLowerCase();
@@ -83,7 +83,7 @@ const Reports = () => {
       const phone = (reg.phone || '').toLowerCase();
       const ticketNumber = (reg.ticket_number || '').toLowerCase();
       const companyName = (reg.company_name || '').toLowerCase();
-      const registrationType = (reg.registration_type || '').toLowerCase();
+      const registrationType = (reg.registration_type || '').toLowerCase().replace('-', ' '); // Handle pre-registered
       const paymentStatus = (reg.payment_status || '').toLowerCase();
       
       return firstName.includes(searchLower)
@@ -99,6 +99,50 @@ const Reports = () => {
 
     console.log(`🔍 Search "${search}": ${filtered.length} results from ${allRegistrations.length} total`);
     setFilteredRegistrations(filtered);
+  };
+
+  // ✅ Calculate counts from filtered data
+  const calculateCounts = (data) => {
+    const counts = {
+      not_printed: 0,
+      printed: 0,
+      reprinted: 0,
+      paid: 0,
+      unpaid: 0,
+      total: data.length
+    };
+
+    data.forEach(reg => {
+      // Payment status
+      if (reg.payment_status === 'paid') {
+        counts.paid++;
+      } else {
+        counts.unpaid++;
+      }
+
+      // Badge/Ticket status
+      const badgeStatus = reg.badge_status?.name?.toLowerCase() || '';
+      const ticketStatus = reg.ticket_status?.name?.toLowerCase() || '';
+      
+      if (badgeStatus.includes('reprinted') || ticketStatus.includes('reprinted')) {
+        counts.reprinted++;
+      } else if (badgeStatus.includes('printed') || ticketStatus.includes('printed')) {
+        counts.printed++;
+      } else {
+        counts.not_printed++;
+      }
+    });
+
+    return counts;
+  };
+
+  // ✅ Format registration type for display
+  const formatRegistrationType = (type) => {
+    if (!type) return 'N/A';
+    // Convert pre-registered to Pre-Registered, onsite to Onsite, online to Online
+    return type.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join('-');
   };
 
   const handleSearchChange = (e) => {
@@ -120,71 +164,75 @@ const Reports = () => {
   const currentRecords = filteredRegistrations.slice(indexOfFirstRecord, indexOfLastRecord);
   const totalPages = Math.ceil(filteredRegistrations.length / recordsPerPage);
 
-  // ✅ PDF Export (uses filtered data)
+  // ✅ PDF Export (uses filtered data with recalculated counts)
   const exportToPDF = async () => {
     try {
       setExporting(true);
       console.log('🚀 Starting PDF export...');
-      
+
       const dataToExport = filteredRegistrations;
-      
+
       if (dataToExport.length === 0) {
         alert('No data to export');
         setExporting(false);
         return;
       }
 
+      // ✅ Calculate counts from filtered data
+      const exportCounts = search ? calculateCounts(dataToExport) : counts;
+
       const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
       });
-      
+
       // Header
       doc.setFontSize(20);
       doc.setTextColor(0, 123, 255);
-      doc.text('📊 Registration Reports', 14, 15);
-      
+      doc.text('Registration Reports', 14, 15);
+
       // Date
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
-      
+
       // Search filter note
       if (search) {
         doc.setFontSize(9);
         doc.setTextColor(255, 0, 0);
         doc.text(`Filtered by: "${search}"`, 14, 27);
       }
-      
-      // Summary section
+
+      // Summary section with all counts
       doc.setFontSize(11);
       doc.setTextColor(0, 0, 0);
       const summaryY = search ? 32 : 28;
       doc.text('Summary:', 14, summaryY);
-      
+
       doc.setFontSize(9);
-      doc.text(`✅ Printed: ${counts.printed}`, 14, summaryY + 5);
-      doc.text(`🔄 Reprinted: ${counts.reprinted}`, 60, summaryY + 5);
-      doc.text(`💰 Paid: ${counts.paid}`, 106, summaryY + 5);
-      doc.text(`❌ Unpaid: ${counts.unpaid}`, 152, summaryY + 5);
-      doc.text(`👥 Total: ${counts.total}`, 198, summaryY + 5);
-      
+      doc.text(`Not Printed: ${exportCounts.not_printed}`, 14, summaryY + 5);
+      doc.text(`Printed: ${exportCounts.printed}`, 50, summaryY + 5);
+      doc.text(`Re-Printed: ${exportCounts.reprinted}`, 86, summaryY + 5);
+      doc.text(`Paid: ${exportCounts.paid}`, 122, summaryY + 5);
+      doc.text(`Unpaid: ${exportCounts.unpaid}`, 158, summaryY + 5);
+      doc.text(`Total: ${exportCounts.total}`, 194, summaryY + 5);
+
       if (search) {
         doc.text(`🔍 Showing: ${dataToExport.length} filtered records`, 14, summaryY + 10);
       }
-      
+
       // Separator
       doc.setDrawColor(200, 200, 200);
       doc.line(14, summaryY + (search ? 13 : 8), 283, summaryY + (search ? 13 : 8));
-      
-      // Table data
+
+      // Table data (includes formatted registration type)
       const tableData = dataToExport.map(reg => [
         String(reg.id || ''),
         `${reg.first_name || ''} ${reg.last_name || ''}`.trim(),
         reg.email || '',
         reg.phone || 'N/A',
-        reg.registration_type || '',
+        formatRegistrationType(reg.registration_type),
         reg.payment_status || '',
         reg.badge_status?.name || 'N/A',
         reg.ticket_status?.name || 'N/A',
@@ -232,7 +280,7 @@ const Reports = () => {
 
       const filename = `registrations_report_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
-      
+
       console.log('✅ PDF saved:', filename);
       alert(`✅ PDF exported successfully!\nRecords: ${dataToExport.length}\nFile: ${filename}`);
     } catch (err) {
@@ -243,11 +291,11 @@ const Reports = () => {
     }
   };
 
-  // ✅ CSV Export (uses filtered data)
+  // ✅ CSV Export (uses filtered data with recalculated counts)
   const exportToCSV = async () => {
     try {
       setExporting(true);
-      
+
       const dataToExport = filteredRegistrations;
       
       if (dataToExport.length === 0) {
@@ -256,24 +304,28 @@ const Reports = () => {
         return;
       }
 
+      // ✅ Calculate counts from filtered data
+      const exportCounts = search ? calculateCounts(dataToExport) : counts;
+
       const summaryRows = [
-        ['📊 Registration Reports'],
+        ['Registration Reports'],
         [`Generated on: ${new Date().toLocaleString()}`],
         ...(search ? [[`Filtered by: "${search}"`]] : []),
         [''],
         ['Summary Statistics'],
-        ['✅ Printed Counts', counts.printed],
-        ['🔄 Re-Printed Counts', counts.reprinted],
-        ['💰 Paid Counts', counts.paid],
-        ['❌ Unpaid Counts', counts.unpaid],
-        ['👥 Total Registrants', counts.total],
+        ['Not Printed', exportCounts.not_printed],
+        ['Printed Counts', exportCounts.printed],
+        ['Re-Printed Counts', exportCounts.reprinted],
+        ['Paid Counts', exportCounts.paid],
+        ['Unpaid Counts', exportCounts.unpaid],
+        ['Total Registrants', exportCounts.total],
         ...(search ? [[`🔍 Filtered Records`, dataToExport.length]] : []),
         [''],
         ['Registration Details']
       ];
 
       const headers = [
-        'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Address',
+        'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Address', 'Company Name',
         'Registration Type', 'Payment Status', 'Badge Status', 'Ticket Status',
         'Registered By', 'Created At'
       ];
@@ -285,7 +337,8 @@ const Reports = () => {
         `"${reg.email || ''}"`,
         `"${reg.phone || 'N/A'}"`,
         `"${(reg.address || 'N/A').replace(/"/g, '""')}"`,
-        reg.registration_type,
+        `"${(reg.company_name || 'N/A').replace(/"/g, '""')}"`,
+        formatRegistrationType(reg.registration_type),
         reg.payment_status,
         `"${reg.badge_status?.name || 'N/A'}"`,
         `"${reg.ticket_status?.name || 'N/A'}"`,
@@ -323,6 +376,16 @@ const Reports = () => {
     }
   };
 
+  // ✅ Get badge color based on registration type
+  const getTypeBadgeColor = (type) => {
+    switch (type) {
+      case 'onsite': return 'primary';
+      case 'online': return 'info';
+      case 'pre-registered': return 'secondary';
+      default: return 'light';
+    }
+  };
+
   return (
     <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -338,7 +401,7 @@ const Reports = () => {
           )}
         </Button>
       </div>
-      
+
       {error && (
         <div className="alert alert-danger alert-dismissible fade show" role="alert">
           ❌ {error}
@@ -350,6 +413,10 @@ const Reports = () => {
         <Col md={4}>
           <h4 className="mb-3">Summary</h4>
           <ListGroup>
+            <ListGroup.Item className="d-flex justify-content-between align-items-center">
+              <span>📄 Not Printed</span>
+              <span className="badge bg-secondary rounded-pill">{counts.not_printed}</span>
+            </ListGroup.Item>
             <ListGroup.Item className="d-flex justify-content-between align-items-center">
               <span>✅ Printed Counts</span>
               <span className="badge bg-success rounded-pill">{counts.printed}</span>
@@ -430,12 +497,12 @@ const Reports = () => {
             </Badge>
           </div>
           
-          {/* ✅ Instant Search Field */}
+          {/* ✅ Instant Search Field (updated placeholder) */}
           <InputGroup className="mb-3">
             <InputGroup.Text>🔍</InputGroup.Text>
             <Form.Control 
               type="text" 
-              placeholder="Instant search: name, email, phone, ticket number..." 
+              placeholder="Search: name, email, phone, ticket, type (onsite, online, pre-registered)..." 
               value={search} 
               onChange={handleSearchChange}
               disabled={loading}
@@ -490,7 +557,9 @@ const Reports = () => {
                           <td><small>{reg.email}</small></td>
                           <td>{reg.phone || 'N/A'}</td>
                           <td>
-                            <small className="text-capitalize">{reg.registration_type}</small>
+                            <Badge bg={getTypeBadgeColor(reg.registration_type)} className="text-capitalize">
+                              {formatRegistrationType(reg.registration_type)}
+                            </Badge>
                           </td>
                           <td>
                             <span className={`badge ${reg.payment_status === 'paid' ? 'bg-success' : 'bg-danger'}`}>

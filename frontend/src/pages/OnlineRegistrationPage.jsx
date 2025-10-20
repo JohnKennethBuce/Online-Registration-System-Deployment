@@ -463,9 +463,8 @@ export default function OnlineRegistrationPage() {
           name="email"
           value={form.email}
           onChange={handleChange}
-          placeholder="Email Address *"
+          placeholder="Email Address (Optional)"
           type="email"
-          required
           style={styles.input}
         />
         <input

@@ -328,22 +328,30 @@ class DashboardController extends Controller
     {
         try {
             $user = Auth::user();
-            $isSuperAdmin = $user->role->name === 'superadmin';
+            /** @var \App\Models\User $user */ // ✅ ADD THIS LINE - It fixes the editor error.
+
+            // THE FIX: Check for superadmin role OR 'view-reports' permission.
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-reports');
             
-            // ✅ FIX: Create proper base query
-            $baseQuery = $isSuperAdmin 
+            // The query will now correctly include all records for users with the right permission.
+            $baseQuery = $canViewAll
                 ? Registration::query() 
                 : Registration::where('registered_by', $user->id);
 
+            $notPrintedStatusId = PrintStatus::where('type', 'badge')->where('name', 'not_printed')->value('id');
             $printedStatusId = PrintStatus::where('type', 'badge')->where('name', 'printed')->value('id');
             $reprintedStatusId = PrintStatus::where('type', 'badge')->where('name', 'reprinted')->value('id');
 
             return response()->json([
-                'printed' => (clone $baseQuery)->where('badge_printed_status_id', $printedStatusId)->count(),
-                'reprinted' => (clone $baseQuery)->where('badge_printed_status_id', $reprintedStatusId)->count(),
-                'paid' => (clone $baseQuery)->where('payment_status', 'paid')->count(),
-                'unpaid' => (clone $baseQuery)->where('payment_status', 'unpaid')->count(),
-                'total' => (clone $baseQuery)->count(),
+                'not_printed' => (clone $baseQuery)->where(function ($query) use ($notPrintedStatusId) {
+                $query->where('badge_printed_status_id', $notPrintedStatusId)
+                ->orWhereNull('badge_printed_status_id');
+                 })->count(),
+                'printed'     => (clone $baseQuery)->where('badge_printed_status_id', $printedStatusId)->count(),
+                'reprinted'   => (clone $baseQuery)->where('badge_printed_status_id', $reprintedStatusId)->count(),
+                'paid'        => (clone $baseQuery)->where('payment_status', 'paid')->count(),
+                'unpaid'      => (clone $baseQuery)->where('payment_status', 'unpaid')->count(),
+                'total'       => (clone $baseQuery)->count(),
             ]);
         } catch (\Exception $e) {
             Log::error('Reports counts error: ' . $e->getMessage());
@@ -354,25 +362,29 @@ class DashboardController extends Controller
         }
     }
 
-    /**
+      /**
      * Reports List with search and export support.
      */
     public function reportsList(Request $request): JsonResponse
     {
         try {
             $user = Auth::user();
-            $isSuperAdmin = $user->role->name === 'superadmin';
+            /** @var \App\Models\User $user */ // ✅ ADD THIS LINE - It fixes the editor error.
+
+            // THE FIX: Check for superadmin role OR 'view-reports' permission.
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-reports');
+
             $perPage = $request->input('per_page', 50);
             $all = $request->boolean('all', false);
 
-            // ✅ FIX: Load relationships properly
             $query = Registration::with([
                 'badgeStatus:id,name,type',
                 'ticketStatus:id,name,type',
                 'registeredBy:id,name,email'
             ]);
 
-            if (!$isSuperAdmin) {
+            // Only filter by the user's ID if they DON'T have permission to view all records.
+            if (!$canViewAll) {
                 $query->where('registered_by', $user->id);
             }
 

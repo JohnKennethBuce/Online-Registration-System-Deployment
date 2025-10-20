@@ -13,7 +13,8 @@ return new class extends Migration {
             // Encrypted personal info
             $table->text('first_name');
             $table->text('last_name');
-            $table->text('email');
+            $table->text('email')->nullable();
+            $table->string('email_hash', 64)->unique()->nullable();
             $table->text('phone')->nullable();
             $table->text('address')->nullable();
 

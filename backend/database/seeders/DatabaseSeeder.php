@@ -27,11 +27,11 @@ class DatabaseSeeder extends Seeder
             SettingsSeeder::class,
         ]);
 
-        // 3. Add test/demo data (only for dev/local)
-        if (app()->isLocal() || app()->environment('development')) {
-            $this->call([
-                TestDataSeeder::class,
-            ]);
-        }
+        //  3. Add test/demo data (only for dev/local)
+        // if (app()->isLocal() || app()->environment('development')) {
+        //     $this->call([
+        //         TestDataSeeder::class,
+        //     ]);
+        // }
     }
 }

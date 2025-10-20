@@ -1,4 +1,3 @@
-// src/api/axios.js
 import axios from "axios";
 
 let logoutHandler = null; // 👈 will be set by AuthContext
@@ -14,7 +13,7 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
-
+ 
 // Request Interceptor - add Authorization automatically
 api.interceptors.request.use(
   (config) => {

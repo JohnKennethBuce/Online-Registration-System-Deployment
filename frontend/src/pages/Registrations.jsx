@@ -22,6 +22,25 @@ export default function Registrations() {
     ["admin", "superadmin"].includes(user.role?.name) &&
     user.role?.permissions?.includes("view-registrations");
 
+  // ✅ Format registration type for display
+  const formatRegistrationType = (type) => {
+    if (!type) return 'N/A';
+    // Convert pre-registered to Pre-Registered, onsite to Onsite, online to Online
+    return type.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join('-');
+  };
+
+  // ✅ Get color for registration type
+  const getTypeColor = (type) => {
+    switch (type) {
+      case 'onsite': return '#007bff';
+      case 'online': return '#17a2b8';
+      case 'pre-registered': return '#6c757d';
+      default: return '#343a40';
+    }
+  };
+
   // --- Fetch registrations ---
   const fetchRegistrations = async (url = "/registrations") => {
     setLoading(true);
@@ -136,39 +155,102 @@ export default function Registrations() {
   if (loading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555" }}>⏳ Loading registrations...</p>;
   if (error) return <p style={{ color: "red", textAlign: "center", fontSize: "1.2rem" }}>❌ {error}</p>;
 
-  // REMOVED: The getPrintingStatus function is no longer needed.
-
   return (
     <div style={{ padding: "20px", maxWidth: "1200px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <h2 style={{ fontSize: "1.8rem", marginBottom: "10px", color: "#333" }}>📋 Registrations</h2>
 
-      {/* Legend is a static visual guide */}
+      {/* Updated Legend with Registration Types */}
       <div style={{
         padding: "10px 15px", backgroundColor: "#f8f9fa", borderRadius: "8px", marginBottom: "20px",
         display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "center", border: "1px solid #ddd"
       }}>
         <h4 style={{ margin: 0, marginRight: "10px", fontSize: "1rem" }}>Legend:</h4>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "15px" }}>
+          {/* Registration Types */}
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "14px", height: "14px", backgroundColor: "#007bff", borderRadius: "3px" }}></span> Onsite
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "14px", height: "14px", backgroundColor: "#17a2b8", borderRadius: "3px" }}></span> Online
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "14px", height: "14px", backgroundColor: "#6c757d", borderRadius: "3px" }}></span> Pre-Registered
+          </span>
+          <span style={{ margin: "0 10px", color: "#ddd" }}>|</span>
+          {/* Payment Status */}
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ width: "14px", height: "14px", backgroundColor: "#28a745", borderRadius: "3px" }}></span> Paid
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ width: "14px", height: "14px", backgroundColor: "#dc3545", borderRadius: "3px" }}></span> Unpaid
           </span>
+          <span style={{ margin: "0 10px", color: "#ddd" }}>|</span>
+          {/* Badge Status */}
           <span style={{ fontWeight: "bold", color: "#6c757d" }}>Not Printed</span>
           <span style={{ fontWeight: "bold", color: "#28a745" }}>Printed</span>
           <span style={{ fontWeight: "bold", color: "#fd7e14" }}>Re-Printed</span>
         </div>
       </div>
 
-      {/* Pagination controls... */}
+      {/* Pagination controls */}
+      {pagination && pagination.meta && (
+        <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>
+            Showing {pagination.meta.from || 0} to {pagination.meta.to || 0} of {pagination.meta.total || 0} registrations
+          </span>
+          <div style={{ display: "flex", gap: "10px" }}>
+            {pagination.links?.prev && (
+              <button
+                onClick={() => fetchRegistrations(pagination.links.prev)}
+                style={{
+                  padding: "8px 12px",
+                  backgroundColor: "#007bff",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                Previous
+              </button>
+            )}
+            {pagination.links?.next && (
+              <button
+                onClick={() => fetchRegistrations(pagination.links.next)}
+                style={{
+                  padding: "8px 12px",
+                  backgroundColor: "#007bff",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                Next
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ overflowX: "auto", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-          {/* Table head remains the same */}
-          <thead>...</thead>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
+          {/* Updated Table Headers */}
+          <thead>
+            <tr style={{ backgroundColor: "#343a40", color: "white" }}>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>ID</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Name</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Company</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Ticket</th>
+              <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Type</th>
+              <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Payment</th>
+              <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Badge Status</th>
+              <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Actions</th>
+            </tr>
+          </thead>
           <tbody>
-            {registrations.map((reg, index) => (
+            {registrations.length > 0 ? (
+              registrations.map((reg, index) => (
                 <tr
                   key={reg.id}
                   style={{
@@ -183,24 +265,45 @@ export default function Registrations() {
                     {reg.first_name} {reg.last_name}
                   </td>
                   <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.company_name || "N/A"}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.ticket_number}</td>
+                  <td style={{ padding: "12px", borderBottom: "1px solid #ddd", fontSize: "0.85rem" }}>{reg.ticket_number}</td>
+                  
+                  {/* ✅ Registration Type */}
                   <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
                     <span
                       style={{
-                        padding: "6px 12px", borderRadius: "20px", color: "white",
+                        padding: "6px 12px", 
+                        borderRadius: "20px", 
+                        color: "white",
+                        backgroundColor: getTypeColor(reg.registration_type),
+                        fontSize: "0.85rem", 
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {formatRegistrationType(reg.registration_type)}
+                    </span>
+                  </td>
+
+                  {/* Payment Status */}
+                  <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
+                    <span
+                      style={{
+                        padding: "6px 12px", 
+                        borderRadius: "20px", 
+                        color: "white",
                         backgroundColor: reg.payment_status === "paid" ? "#28a745" : "#dc3545",
-                        fontSize: "0.9rem", fontWeight: "bold",
+                        fontSize: "0.9rem", 
+                        fontWeight: "bold",
                       }}
                     >
                       {reg.payment_status?.toUpperCase() || "UNPAID"}
                     </span>
                   </td>
                   
-                  {/* MODIFIED: Using the object from the backend */}
+                  {/* Badge Status */}
                   <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
                     <span
                       style={{
-                        color: reg.badge_status_display?.color || '#6c757d', // Use color from backend
+                        color: reg.badge_status_display?.color || '#6c757d',
                         fontSize: "0.9rem",
                         fontWeight: "bold",
                         textTransform: 'uppercase'
@@ -210,54 +313,81 @@ export default function Registrations() {
                     </span>
                   </td>
 
-                  <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd", display: "flex", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
-                    {/* MODIFIED: Using the real status name for the button text */}
-                    <button
-                      onClick={() => handlePrintBadge(reg)}
-                      disabled={printingId === reg.id}
-                      style={{
-                        padding: "8px 12px", backgroundColor: "#17a2b8", color: "white", border: "none", borderRadius: "4px", cursor: "pointer",
-                        opacity: printingId === reg.id ? 0.5 : 1, transition: "background-color 0.3s",
-                      }}
-                      onMouseOver={(e) => e.target.style.backgroundColor = "#138496"}
-                      onMouseOut={(e) => e.target.style.backgroundColor = "#17a2b8"}
-                    >
-                      {printingId === reg.id 
-                        ? "Printing…" 
-                        : (reg.badge_status?.name && reg.badge_status.name !== 'not_printed' ? "Re-Print Badge" : "Print Badge")
-                      }
-                    </button>
-
-                    {user.role?.permissions?.includes("edit-registration") && (
+                  {/* Actions */}
+                  <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
+                    <div style={{ display: "flex", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
                       <button
-                        onClick={() => handleEditClick(reg)}
+                        onClick={() => handlePrintBadge(reg)}
+                        disabled={printingId === reg.id}
                         style={{
-                          padding: "8px 12px", backgroundColor: "#ffc107", color: "#212529", border: "none", borderRadius: "4px", cursor: "pointer",
+                          padding: "8px 12px", 
+                          backgroundColor: "#17a2b8", 
+                          color: "white", 
+                          border: "none", 
+                          borderRadius: "4px", 
+                          cursor: "pointer",
+                          opacity: printingId === reg.id ? 0.5 : 1, 
                           transition: "background-color 0.3s",
+                          fontSize: "0.85rem"
                         }}
-                        onMouseOver={(e) => e.target.style.backgroundColor = "#e0a800"}
-                        onMouseOut={(e) => e.target.style.backgroundColor = "#ffc107"}
+                        onMouseOver={(e) => e.target.style.backgroundColor = "#138496"}
+                        onMouseOut={(e) => e.target.style.backgroundColor = "#17a2b8"}
                       >
-                        Edit
+                        {printingId === reg.id 
+                          ? "Printing…" 
+                          : (reg.badge_status?.name && reg.badge_status.name !== 'not_printed' ? "Re-Print Badge" : "Print Badge")
+                        }
                       </button>
-                    )}
 
-                    {user.role?.permissions?.includes("delete-registration") && (
-                      <button
-                        onClick={() => handleDelete(reg.id)}
-                        style={{
-                          padding: "8px 12px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "4px", cursor: "pointer",
-                          transition: "background-color 0.3s",
-                        }}
-                        onMouseOver={(e) => e.target.style.backgroundColor = "#c82333"}
-                        onMouseOut={(e) => e.target.style.backgroundColor = "#dc3545"}
-                      >
-                        Delete
-                      </button>
-                    )}
+                      {user.role?.permissions?.includes("edit-registration") && (
+                        <button
+                          onClick={() => handleEditClick(reg)}
+                          style={{
+                            padding: "8px 12px", 
+                            backgroundColor: "#ffc107", 
+                            color: "#212529", 
+                            border: "none", 
+                            borderRadius: "4px", 
+                            cursor: "pointer",
+                            transition: "background-color 0.3s",
+                            fontSize: "0.85rem"
+                          }}
+                          onMouseOver={(e) => e.target.style.backgroundColor = "#e0a800"}
+                          onMouseOut={(e) => e.target.style.backgroundColor = "#ffc107"}
+                        >
+                          Edit
+                        </button>
+                      )}
+
+                      {user.role?.permissions?.includes("delete-registration") && (
+                        <button
+                          onClick={() => handleDelete(reg.id)}
+                          style={{
+                            padding: "8px 12px", 
+                            backgroundColor: "#dc3545", 
+                            color: "white", 
+                            border: "none", 
+                            borderRadius: "4px", 
+                            cursor: "pointer",
+                            transition: "background-color 0.3s",
+                            fontSize: "0.85rem"
+                          }}
+                          onMouseOver={(e) => e.target.style.backgroundColor = "#c82333"}
+                          onMouseOut={(e) => e.target.style.backgroundColor = "#dc3545"}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
-              )
+              ))
+            ) : (
+              <tr>
+                <td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#6c757d" }}>
+                  No registrations found
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
