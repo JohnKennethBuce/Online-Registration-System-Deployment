@@ -1,24 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
+import { Form, Button, Row, Col, Spinner, Alert } from 'react-bootstrap';
 
 export default function EditRegistrationForm({ registration, onSave, onCancel }) {
-  // Sanitize the initial data to prevent the uncontrolled input error
-  const getInitialData = (reg) => ({
-    ...reg,
-    first_name: reg.first_name || '',
-    last_name: reg.last_name || '',
-    company_name: reg.company_name || '',
-    email: reg.email || '',
-    phone: reg.phone || '',
-    address: reg.address || '',
-    registration_type: reg.registration_type || 'onsite',
-    payment_status: reg.payment_status || 'unpaid'
-  });
+  const [formData, setFormData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const [formData, setFormData] = useState(() => getInitialData(registration));
-
-  // Update form data if the selected registration changes
   useEffect(() => {
-    setFormData(getInitialData(registration));
+    if (registration) {
+      setFormData({
+        first_name: registration.first_name || '',
+        last_name: registration.last_name || '',
+        email: registration.email || '',
+        phone: registration.phone || '',
+        address: registration.address || '',
+        company_name: registration.company_name || '',
+        registration_type: registration.registration_type || 'onsite',
+      });
+    }
   }, [registration]);
 
   const handleChange = (e) => {
@@ -26,186 +25,82 @@ export default function EditRegistrationForm({ registration, onSave, onCancel })
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Only send the fields that can be edited
-    const dataToSave = {
-      id: formData.id,
-      first_name: formData.first_name,
-      last_name: formData.last_name,
-      company_name: formData.company_name,
-      email: formData.email,
-      phone: formData.phone,
-      address: formData.address,
-      registration_type: formData.registration_type,
-      payment_status: formData.payment_status,
-    };
-    onSave(dataToSave);
-  };
-
-  const inputStyle = { 
-    width: '100%', 
-    padding: '8px', 
-    marginBottom: '10px',
-    borderRadius: '6px',
-    border: '1px solid #ccc',
-    fontSize: '14px',
-  };
-
-  const labelStyle = {
-    display: 'block',
-    marginBottom: '4px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#333'
+    setLoading(true);
+    setError('');
+    
+    // The onSave function (from the parent) will handle the API call
+    // We pass the form data along with the original ID.
+    try {
+        await onSave({ ...formData, id: registration.id });
+    } catch(err) {
+        // This allows the parent component to pass back an error message
+        setError(err.message || "An unknown error occurred.");
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>First Name *</label>
-        <input 
-          name="first_name" 
-          value={formData.first_name} 
-          onChange={handleChange} 
-          style={inputStyle} 
-          required 
-        />
-      </div>
+    <Form onSubmit={handleSubmit}>
+      {error && <Alert variant="danger">{error}</Alert>}
+      
+      <Row className="g-3">
+        <Col md={6}>
+          <Form.Group controlId="formFirstName">
+            <Form.Label>First Name</Form.Label>
+            <Form.Control type="text" name="first_name" value={formData.first_name} onChange={handleChange} required />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group controlId="formLastName">
+            <Form.Label>Last Name</Form.Label>
+            <Form.Control type="text" name="last_name" value={formData.last_name} onChange={handleChange} required />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group controlId="formEmail">
+            <Form.Label>Email</Form.Label>
+            <Form.Control type="email" name="email" value={formData.email} onChange={handleChange} />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group controlId="formPhone">
+            <Form.Label>Phone</Form.Label>
+            <Form.Control type="text" name="phone" value={formData.phone} onChange={handleChange} />
+          </Form.Group>
+        </Col>
+        <Col xs={12}>
+          <Form.Group controlId="formCompany">
+            <Form.Label>Company Name</Form.Label>
+            <Form.Control type="text" name="company_name" value={formData.company_name} onChange={handleChange} />
+          </Form.Group>
+        </Col>
+        <Col xs={12}>
+          <Form.Group controlId="formAddress">
+            <Form.Label>Address</Form.Label>
+            <Form.Control as="textarea" rows={2} name="address" value={formData.address} onChange={handleChange} />
+          </Form.Group>
+        </Col>
+        <Col xs={12}>
+          <Form.Group controlId="formRegType">
+            <Form.Label>Registration Type</Form.Label>
+            <Form.Select name="registration_type" value={formData.registration_type} onChange={handleChange}>
+              <option value="onsite">Onsite</option>
+              <option value="online">Online</option>
+              <option value="pre-registered">Pre-Registered</option>
+            </Form.Select>
+          </Form.Group>
+        </Col>
+      </Row>
 
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>Last Name *</label>
-        <input 
-          name="last_name" 
-          value={formData.last_name} 
-          onChange={handleChange} 
-          style={inputStyle} 
-          required 
-        />
+      <div className="d-flex justify-content-end gap-2 mt-4">
+        <Button variant="secondary" onClick={onCancel} disabled={loading}>Cancel</Button>
+        <Button variant="primary" type="submit" disabled={loading}>
+          {loading ? <Spinner as="span" animation="border" size="sm" /> : 'Save Changes'}
+        </Button>
       </div>
-
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>Email</label>
-        <input 
-          type="email"
-          name="email" 
-          value={formData.email} 
-          onChange={handleChange} 
-          style={inputStyle} 
-        />
-      </div>
-
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>Phone</label>
-        <input 
-          name="phone" 
-          value={formData.phone} 
-          onChange={handleChange} 
-          style={inputStyle} 
-        />
-      </div>
-
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>Address</label>
-        <input 
-          name="address" 
-          value={formData.address} 
-          onChange={handleChange} 
-          style={inputStyle} 
-        />
-      </div>
-
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>Company Name</label>
-        <input 
-          name="company_name" 
-          value={formData.company_name} 
-          onChange={handleChange} 
-          style={inputStyle} 
-        />
-      </div>
-
-      {/* ✅ Registration Type with Pre-Registered */}
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>Registration Type</label>
-        <select
-          name="registration_type"
-          value={formData.registration_type}
-          onChange={handleChange}
-          style={{
-            ...inputStyle,
-            cursor: 'pointer',
-            backgroundColor: 'white'
-          }}
-        >
-          <option value="onsite">Onsite</option>
-          <option value="online">Online</option>
-          <option value="pre-registered">Pre-Registered</option>
-        </select>
-      </div>
-
-      {/* ✅ Payment Status */}
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>Payment Status</label>
-        <select
-          name="payment_status"
-          value={formData.payment_status}
-          onChange={handleChange}
-          style={{
-            ...inputStyle,
-            cursor: 'pointer',
-            backgroundColor: 'white'
-          }}
-        >
-          <option value="unpaid">Unpaid</option>
-          <option value="paid">Paid</option>
-        </select>
-      </div>
-
-      {/* Action Buttons */}
-      <div style={{ 
-        marginTop: '20px', 
-        textAlign: 'right',
-        paddingTop: '15px',
-        borderTop: '1px solid #e0e0e0'
-      }}>
-        <button 
-          type="button" 
-          onClick={onCancel} 
-          style={{ 
-            marginRight: '10px',
-            padding: '8px 16px',
-            backgroundColor: '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500'
-          }}
-          onMouseOver={(e) => e.target.style.backgroundColor = '#5a6268'}
-          onMouseOut={(e) => e.target.style.backgroundColor = '#6c757d'}
-        >
-          Cancel
-        </button>
-        <button 
-          type="submit" 
-          style={{ 
-            padding: '8px 16px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }}
-          onMouseOver={(e) => e.target.style.backgroundColor = '#0056b3'}
-          onMouseOut={(e) => e.target.style.backgroundColor = '#007bff'}
-        >
-          Save Changes
-        </button>
-      </div>
-    </form>
+    </Form>
   );
 }

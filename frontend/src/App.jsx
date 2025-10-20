@@ -1,9 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { Navbar, Nav, Container, Button, Dropdown } from 'react-bootstrap';
+import { useState, useEffect } from 'react'; // ⬅️ ADD THIS LINE
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import api from './api/axios'; // ⬅️ ADD THIS LINE TOO
 import ProtectedRoute from "./ProtectedRoute";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
+
 
 // Import all pages
 import Home from "./pages/Home";
@@ -25,11 +28,42 @@ import ScannerPage from './pages/ScannerPage';
 import BadgePrintPage from './pages/BadgePrintPage';
 import Reports from './pages/Reports';  
 
-// 🔹 Ultra-Modern NavBar Component
+/// 🔹 Ultra-Modern NavBar Component - THIS IS THE ONE TO MODIFY
 function NavBar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // ADD THESE NEW LINES
+  const [logoPath, setLogoPath] = useState('');
+  const backendUrl = api.defaults.baseURL.replace('/api', '');
+
+  // ADD THIS useEffect
+  useEffect(() => {
+    fetchLogo();
+  }, []);
+
+  // ADD THIS FUNCTION
+  const fetchLogo = async () => {
+    try {
+      const res = await api.get('/settings');
+      if (res.data?.registration_logo_path) {
+        setLogoPath(res.data.registration_logo_path);
+      }
+    } catch (err) {
+      console.error('Failed to fetch logo:', err);
+    }
+  };
+
+  // ADD THIS HELPER FUNCTION
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    const normalized = String(path)
+      .replace(/\\/g, '/')
+      .replace(/^\/?storage\/?/i, '');
+    return `${backendUrl}/storage/${normalized}`;
+  };
 
   // Hide NavBar on print-badge routes
   if (location.pathname.startsWith('/print-badge')) {
@@ -72,15 +106,36 @@ function NavBar() {
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          <span 
-            style={{ 
-              fontSize: '2rem',
-              filter: 'drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3))',
-              animation: 'float 3s ease-in-out infinite'
-            }}
-          >
-            🎫
-          </span>
+          {/* REPLACE THE EXISTING SPAN WITH THIS CONDITIONAL RENDERING */}
+          {logoPath ? (
+            <img 
+              src={getImageUrl(logoPath)}
+              alt="Registration Logo"
+              style={{
+                height: '40px',
+                width: 'auto',
+                maxWidth: '60px',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3))',
+                animation: 'float 3s ease-in-out infinite'
+              }}
+              onError={(e) => {
+                console.error('Logo failed to load');
+                setLogoPath(''); // Reset logo path on error
+              }}
+            />
+          ) : (
+            <span 
+              style={{ 
+                fontSize: '2rem',
+                filter: 'drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3))',
+                animation: 'float 3s ease-in-out infinite'
+              }}
+            >
+              🎫
+            </span>
+          )}
+          
           <span>Registration System</span>
         </Navbar.Brand>
         

@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->string('email_hash', 64)->unique()->nullable();
             $table->text('phone')->nullable();
             $table->text('address')->nullable();
+            $table->text('company_name');
 
             $table->enum('registration_type', ['onsite','online','pre-registered'])->index();
 

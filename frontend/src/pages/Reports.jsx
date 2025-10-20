@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Table, Form, Button, Container, Row, Col, ListGroup, InputGroup, Spinner, Badge } from 'react-bootstrap';
+import { Table, Form, Button, Container, Row, Col, ListGroup, InputGroup, Spinner, Badge, Card } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const Reports = () => {
   const [counts, setCounts] = useState({not_printed: 0, printed: 0, reprinted: 0, paid: 0, unpaid: 0, total: 0 });
-  const [allRegistrations, setAllRegistrations] = useState([]); // ✅ All loaded data
-  const [filteredRegistrations, setFilteredRegistrations] = useState([]); // ✅ Filtered results
+  const [allRegistrations, setAllRegistrations] = useState([]);
+  const [filteredRegistrations, setFilteredRegistrations] = useState([]);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(50);
@@ -16,17 +16,43 @@ const Reports = () => {
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
 
+  // ✅ NEW: Date filtering
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // ✅ NEW: Payment filtering
+  const [paymentFilter, setPaymentFilter] = useState('both'); // 'paid', 'unpaid', 'both'
+
+  // ✅ NEW: Sorting (default ascending by ID)
+  const [sortField, setSortField] = useState('id');
+  const [sortOrder, setSortOrder] = useState('asc');
+
+  // ✅ NEW: Column visibility
+  const [visibleColumns, setVisibleColumns] = useState({
+    id: true,
+    name: true,
+    email: true,
+    phone: true,
+    address: false,
+    company: false,
+    type: true,
+    payment: true,
+    badge: true,
+    ticket: true,
+    date: true
+  });
+
   // ✅ Load all data once on mount
   useEffect(() => {
     fetchCounts();
     fetchAllData();
   }, []);
 
-  // ✅ Filter data whenever search term changes
+  // ✅ Filter and sort data whenever any filter changes
   useEffect(() => {
-    filterData();
-    setCurrentPage(1); // Reset to first page when search changes
-  }, [search, allRegistrations]);
+    filterAndSortData();
+    setCurrentPage(1);
+  }, [search, allRegistrations, dateFrom, dateTo, paymentFilter, sortField, sortOrder]);
 
   const fetchCounts = async () => {
     try {
@@ -45,7 +71,6 @@ const Reports = () => {
       setLoading(true);
       setError(null);
 
-      // ✅ Load ALL data at once
       const res = await api.get('/dashboard/reports-list', { 
         params: { all: true } 
       });
@@ -54,7 +79,7 @@ const Reports = () => {
       console.log('✅ Loaded all registrations:', data.length);
       
       setAllRegistrations(data);
-      setFilteredRegistrations(data); // Initially show all
+      setFilteredRegistrations(data);
     } catch (err) {
       console.error('❌ Error fetching data:', err);
       setError(err.response?.data?.message || 'Failed to fetch registrations');
@@ -65,39 +90,96 @@ const Reports = () => {
     }
   };
 
-  // ✅ Client-side filtering (includes pre-registered)
-  const filterData = () => {
-    if (!search.trim()) {
-      setFilteredRegistrations(allRegistrations);
-      return;
+  // ✅ Enhanced filtering with date, payment, search, and sorting
+  const filterAndSortData = () => {
+    let filtered = [...allRegistrations];
+
+    // 1. Search filter
+    if (search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filtered = filtered.filter(reg => {
+        const firstName = (reg.first_name || '').toLowerCase();
+        const lastName = (reg.last_name || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`;
+        const email = (reg.email || '').toLowerCase();
+        const phone = (reg.phone || '').toLowerCase();
+        const ticketNumber = (reg.ticket_number || '').toLowerCase();
+        const companyName = (reg.company_name || '').toLowerCase();
+        const registrationType = (reg.registration_type || '').toLowerCase().replace('-', ' ');
+        const paymentStatus = (reg.payment_status || '').toLowerCase();
+        
+        return firstName.includes(searchLower)
+          || lastName.includes(searchLower)
+          || fullName.includes(searchLower)
+          || email.includes(searchLower)
+          || phone.includes(searchLower)
+          || ticketNumber.includes(searchLower)
+          || companyName.includes(searchLower)
+          || registrationType.includes(searchLower)
+          || paymentStatus.includes(searchLower);
+      });
     }
 
-    const searchLower = search.toLowerCase().trim();
+    // 2. Date range filter
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(reg => {
+        const regDate = new Date(reg.created_at);
+        return regDate >= fromDate;
+      });
+    }
 
-    const filtered = allRegistrations.filter(reg => {
-      // Search in multiple fields
-      const firstName = (reg.first_name || '').toLowerCase();
-      const lastName = (reg.last_name || '').toLowerCase();
-      const fullName = `${firstName} ${lastName}`;
-      const email = (reg.email || '').toLowerCase();
-      const phone = (reg.phone || '').toLowerCase();
-      const ticketNumber = (reg.ticket_number || '').toLowerCase();
-      const companyName = (reg.company_name || '').toLowerCase();
-      const registrationType = (reg.registration_type || '').toLowerCase().replace('-', ' '); // Handle pre-registered
-      const paymentStatus = (reg.payment_status || '').toLowerCase();
-      
-      return firstName.includes(searchLower)
-        || lastName.includes(searchLower)
-        || fullName.includes(searchLower)
-        || email.includes(searchLower)
-        || phone.includes(searchLower)
-        || ticketNumber.includes(searchLower)
-        || companyName.includes(searchLower)
-        || registrationType.includes(searchLower)
-        || paymentStatus.includes(searchLower);
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(reg => {
+        const regDate = new Date(reg.created_at);
+        return regDate <= toDate;
+      });
+    }
+
+    // 3. Payment filter
+    if (paymentFilter !== 'both') {
+      filtered = filtered.filter(reg => reg.payment_status === paymentFilter);
+    }
+
+    // 4. Sorting
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortField) {
+        case 'id':
+          aVal = a.id || 0;
+          bVal = b.id || 0;
+          break;
+        case 'name':
+          aVal = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase();
+          bVal = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase();
+          break;
+        case 'email':
+          aVal = (a.email || '').toLowerCase();
+          bVal = (b.email || '').toLowerCase();
+          break;
+        case 'date':
+          aVal = new Date(a.created_at);
+          bVal = new Date(b.created_at);
+          break;
+        case 'payment':
+          aVal = a.payment_status || '';
+          bVal = b.payment_status || '';
+          break;
+        default:
+          aVal = a[sortField] || '';
+          bVal = b[sortField] || '';
+      }
+
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
     });
 
-    console.log(`🔍 Search "${search}": ${filtered.length} results from ${allRegistrations.length} total`);
+    console.log(`🔍 Filtered: ${filtered.length} from ${allRegistrations.length} total`);
     setFilteredRegistrations(filtered);
   };
 
@@ -113,14 +195,12 @@ const Reports = () => {
     };
 
     data.forEach(reg => {
-      // Payment status
       if (reg.payment_status === 'paid') {
         counts.paid++;
       } else {
         counts.unpaid++;
       }
 
-      // Badge/Ticket status
       const badgeStatus = reg.badge_status?.name?.toLowerCase() || '';
       const ticketStatus = reg.ticket_status?.name?.toLowerCase() || '';
       
@@ -136,35 +216,58 @@ const Reports = () => {
     return counts;
   };
 
-  // ✅ Format registration type for display
   const formatRegistrationType = (type) => {
     if (!type) return 'N/A';
-    // Convert pre-registered to Pre-Registered, onsite to Onsite, online to Online
     return type.split('-').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join('-');
   };
 
-  const handleSearchChange = (e) => {
-    setSearch(e.target.value);
-  };
-
-  const handleClearSearch = () => {
-    setSearch('');
-  };
-
+  const handleSearchChange = (e) => setSearch(e.target.value);
+  const handleClearSearch = () => setSearch('');
   const handleRefresh = () => {
     fetchAllData();
     fetchCounts();
   };
 
-  // ✅ Pagination calculations (client-side)
+  // ✅ NEW: Handle column visibility toggle
+  const handleColumnToggle = (column) => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [column]: !prev[column]
+    }));
+  };
+
+  // ✅ NEW: Handle sorting
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  // ✅ NEW: Clear all filters
+  const handleClearFilters = () => {
+    setSearch('');
+    setDateFrom('');
+    setDateTo('');
+    setPaymentFilter('both');
+    setSortField('id');
+    setSortOrder('asc');
+  };
+
+  // ✅ Pagination
   const indexOfLastRecord = currentPage * recordsPerPage;
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
   const currentRecords = filteredRegistrations.slice(indexOfFirstRecord, indexOfLastRecord);
   const totalPages = Math.ceil(filteredRegistrations.length / recordsPerPage);
 
-  // ✅ PDF Export (uses filtered data with recalculated counts)
+  // ✅ Check if any filter is active
+  const hasActiveFilters = search || dateFrom || dateTo || paymentFilter !== 'both' || sortField !== 'id' || sortOrder !== 'asc';
+
+  // ✅ PDF Export
   const exportToPDF = async () => {
     try {
       setExporting(true);
@@ -178,8 +281,7 @@ const Reports = () => {
         return;
       }
 
-      // ✅ Calculate counts from filtered data
-      const exportCounts = search ? calculateCounts(dataToExport) : counts;
+      const exportCounts = hasActiveFilters ? calculateCounts(dataToExport) : counts;
 
       const doc = new jsPDF({
         orientation: 'landscape',
@@ -187,62 +289,90 @@ const Reports = () => {
         format: 'a4'
       });
 
-      // Header
       doc.setFontSize(20);
       doc.setTextColor(0, 123, 255);
       doc.text('Registration Reports', 14, 15);
 
-      // Date
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
 
-      // Search filter note
-      if (search) {
+      let yPos = 27;
+
+      // Filter info
+      if (hasActiveFilters) {
         doc.setFontSize(9);
         doc.setTextColor(255, 0, 0);
-        doc.text(`Filtered by: "${search}"`, 14, 27);
+        if (search) doc.text(`Search: "${search}"`, 14, yPos++);
+        if (dateFrom) doc.text(`From: ${dateFrom}`, 14, yPos += 4);
+        if (dateTo) doc.text(`To: ${dateTo}`, 14, yPos += 4);
+        if (paymentFilter !== 'both') doc.text(`Payment: ${paymentFilter}`, 14, yPos += 4);
+        yPos += 3;
       }
 
-      // Summary section with all counts
+      // Summary
       doc.setFontSize(11);
       doc.setTextColor(0, 0, 0);
-      const summaryY = search ? 32 : 28;
-      doc.text('Summary:', 14, summaryY);
+      doc.text('Summary:', 14, yPos);
 
       doc.setFontSize(9);
-      doc.text(`Not Printed: ${exportCounts.not_printed}`, 14, summaryY + 5);
-      doc.text(`Printed: ${exportCounts.printed}`, 50, summaryY + 5);
-      doc.text(`Re-Printed: ${exportCounts.reprinted}`, 86, summaryY + 5);
-      doc.text(`Paid: ${exportCounts.paid}`, 122, summaryY + 5);
-      doc.text(`Unpaid: ${exportCounts.unpaid}`, 158, summaryY + 5);
-      doc.text(`Total: ${exportCounts.total}`, 194, summaryY + 5);
+      yPos += 5;
+      doc.text(`Not Printed: ${exportCounts.not_printed}`, 14, yPos);
+      doc.text(`Printed: ${exportCounts.printed}`, 50, yPos);
+      doc.text(`Re-Printed: ${exportCounts.reprinted}`, 86, yPos);
+      doc.text(`Paid: ${exportCounts.paid}`, 122, yPos);
+      doc.text(`Unpaid: ${exportCounts.unpaid}`, 158, yPos);
+      doc.text(`Total: ${exportCounts.total}`, 194, yPos);
 
-      if (search) {
-        doc.text(`🔍 Showing: ${dataToExport.length} filtered records`, 14, summaryY + 10);
+      if (hasActiveFilters) {
+        yPos += 5;
+        doc.text(`🔍 Showing: ${dataToExport.length} filtered records`, 14, yPos);
       }
 
-      // Separator
+      yPos += 3;
       doc.setDrawColor(200, 200, 200);
-      doc.line(14, summaryY + (search ? 13 : 8), 283, summaryY + (search ? 13 : 8));
+      doc.line(14, yPos, 283, yPos);
 
-      // Table data (includes formatted registration type)
-      const tableData = dataToExport.map(reg => [
-        String(reg.id || ''),
-        `${reg.first_name || ''} ${reg.last_name || ''}`.trim(),
-        reg.email || '',
-        reg.phone || 'N/A',
-        formatRegistrationType(reg.registration_type),
-        reg.payment_status || '',
-        reg.badge_status?.name || 'N/A',
-        reg.ticket_status?.name || 'N/A',
-        reg.registered_by?.name || 'System',
-        new Date(reg.created_at).toLocaleDateString()
-      ]);
+      // Prepare table data based on visible columns
+      const headers = [];
+      const columnIndices = [];
+
+      if (visibleColumns.id) { headers.push('ID'); columnIndices.push('id'); }
+      if (visibleColumns.name) { headers.push('Name'); columnIndices.push('name'); }
+      if (visibleColumns.email) { headers.push('Email'); columnIndices.push('email'); }
+      if (visibleColumns.phone) { headers.push('Phone'); columnIndices.push('phone'); }
+      if (visibleColumns.address) { headers.push('Address'); columnIndices.push('address'); }
+      if (visibleColumns.company) { headers.push('Company'); columnIndices.push('company'); }
+      if (visibleColumns.type) { headers.push('Type'); columnIndices.push('type'); }
+      if (visibleColumns.payment) { headers.push('Payment'); columnIndices.push('payment'); }
+      if (visibleColumns.badge) { headers.push('Badge'); columnIndices.push('badge'); }
+      if (visibleColumns.ticket) { headers.push('Ticket'); columnIndices.push('ticket'); }
+      if (visibleColumns.date) { headers.push('Date'); columnIndices.push('date'); }
+
+      const tableData = dataToExport.map(reg => {
+        const row = [];
+        columnIndices.forEach(col => {
+          switch(col) {
+            case 'id': row.push(String(reg.id || '')); break;
+            case 'name': row.push(`${reg.first_name || ''} ${reg.last_name || ''}`.trim()); break;
+            case 'email': row.push(reg.email || ''); break;
+            case 'phone': row.push(reg.phone || 'N/A'); break;
+            case 'address': row.push(reg.address || 'N/A'); break;
+            case 'company': row.push(reg.company_name || 'N/A'); break;
+            case 'type': row.push(formatRegistrationType(reg.registration_type)); break;
+            case 'payment': row.push(reg.payment_status || ''); break;
+            case 'badge': row.push(reg.badge_status?.name || 'N/A'); break;
+            case 'ticket': row.push(`#${reg.id}`); break;
+            case 'date': row.push(new Date(reg.created_at).toLocaleDateString()); break;
+            default: row.push('');
+          }
+        });
+        return row;
+      });
 
       autoTable(doc, {
-        startY: summaryY + (search ? 17 : 12),
-        head: [['ID', 'Name', 'Email', 'Phone', 'Type', 'Payment', 'Badge', 'Ticket', 'By', 'Date']],
+        startY: yPos + 4,
+        head: [headers],
         body: tableData,
         theme: 'striped',
         styles: { 
@@ -254,18 +384,6 @@ const Reports = () => {
           textColor: [255, 255, 255],
           fontStyle: 'bold',
           halign: 'center'
-        },
-        columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 35 },
-          2: { cellWidth: 45 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 22, halign: 'center' },
-          5: { cellWidth: 20, halign: 'center' },
-          6: { cellWidth: 22, halign: 'center' },
-          7: { cellWidth: 22, halign: 'center' },
-          8: { cellWidth: 30 },
-          9: { cellWidth: 25, halign: 'center' }
         },
         didDrawPage: (data) => {
           const pageCount = doc.getNumberOfPages();
@@ -291,7 +409,7 @@ const Reports = () => {
     }
   };
 
-  // ✅ CSV Export (uses filtered data with recalculated counts)
+  // ✅ CSV Export
   const exportToCSV = async () => {
     try {
       setExporting(true);
@@ -304,13 +422,15 @@ const Reports = () => {
         return;
       }
 
-      // ✅ Calculate counts from filtered data
-      const exportCounts = search ? calculateCounts(dataToExport) : counts;
+      const exportCounts = hasActiveFilters ? calculateCounts(dataToExport) : counts;
 
       const summaryRows = [
         ['Registration Reports'],
         [`Generated on: ${new Date().toLocaleString()}`],
-        ...(search ? [[`Filtered by: "${search}"`]] : []),
+        ...(search ? [[`Search Filter: "${search}"`]] : []),
+        ...(dateFrom ? [[`Date From: ${dateFrom}`]] : []),
+        ...(dateTo ? [[`Date To: ${dateTo}`]] : []),
+        ...(paymentFilter !== 'both' ? [[`Payment Filter: ${paymentFilter}`]] : []),
         [''],
         ['Summary Statistics'],
         ['Not Printed', exportCounts.not_printed],
@@ -319,32 +439,40 @@ const Reports = () => {
         ['Paid Counts', exportCounts.paid],
         ['Unpaid Counts', exportCounts.unpaid],
         ['Total Registrants', exportCounts.total],
-        ...(search ? [[`🔍 Filtered Records`, dataToExport.length]] : []),
+        ...(hasActiveFilters ? [[`🔍 Filtered Records`, dataToExport.length]] : []),
         [''],
         ['Registration Details']
       ];
 
-      const headers = [
-        'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Address', 'Company Name',
-        'Registration Type', 'Payment Status', 'Badge Status', 'Ticket Status',
-        'Registered By', 'Created At'
-      ];
+      const headers = [];
+      if (visibleColumns.id) headers.push('ID');
+      if (visibleColumns.name) headers.push('First Name', 'Last Name');
+      if (visibleColumns.email) headers.push('Email');
+      if (visibleColumns.phone) headers.push('Phone');
+      if (visibleColumns.address) headers.push('Address');
+      if (visibleColumns.company) headers.push('Company Name');
+      if (visibleColumns.type) headers.push('Registration Type');
+      if (visibleColumns.payment) headers.push('Payment Status');
+      if (visibleColumns.badge) headers.push('Badge Status');
+      if (visibleColumns.ticket) headers.push('Ticket Status');
+      if (visibleColumns.date) headers.push('Created At');
 
-      const dataRows = dataToExport.map(reg => [
-        reg.id,
-        `"${reg.first_name || ''}"`,
-        `"${reg.last_name || ''}"`,
-        `"${reg.email || ''}"`,
-        `"${reg.phone || 'N/A'}"`,
-        `"${(reg.address || 'N/A').replace(/"/g, '""')}"`,
-        `"${(reg.company_name || 'N/A').replace(/"/g, '""')}"`,
-        formatRegistrationType(reg.registration_type),
-        reg.payment_status,
-        `"${reg.badge_status?.name || 'N/A'}"`,
-        `"${reg.ticket_status?.name || 'N/A'}"`,
-        `"${reg.registered_by?.name || 'System'}"`,
-        new Date(reg.created_at).toLocaleString()
-      ]);
+      const dataRows = dataToExport.map(reg => {
+        const row = [];
+        if (visibleColumns.id) row.push(reg.id);
+        if (visibleColumns.name) row.push(`"${reg.first_name || ''}"`, `"${reg.last_name || ''}"`);
+        if (visibleColumns.email) row.push(`"${reg.email || ''}"`);
+        if (visibleColumns.phone) row.push(`"${reg.phone || 'N/A'}"`);
+        if (visibleColumns.address) row.push(`"${(reg.address || 'N/A').replace(/"/g, '""')}"`);
+        if (visibleColumns.company) row.push(`"${(reg.company_name || 'N/A').replace(/"/g, '""')}"`);
+        if (visibleColumns.type) row.push(formatRegistrationType(reg.registration_type));
+        if (visibleColumns.payment) row.push(reg.payment_status);
+        if (visibleColumns.badge) row.push(`"${reg.badge_status?.name || 'N/A'}"`);
+        if (visibleColumns.ticket) row.push(`#${reg.id}`);
+
+        if (visibleColumns.date) row.push(new Date(reg.created_at).toLocaleString());
+        return row;
+      });
 
       const csvRows = [
         ...summaryRows.map(row => row.join(',')),
@@ -376,7 +504,6 @@ const Reports = () => {
     }
   };
 
-  // ✅ Get badge color based on registration type
   const getTypeBadgeColor = (type) => {
     switch (type) {
       case 'onsite': return 'primary';
@@ -386,8 +513,13 @@ const Reports = () => {
     }
   };
 
+  const getSortIcon = (field) => {
+    if (sortField !== field) return '↕️';
+    return sortOrder === 'asc' ? '↑' : '↓';
+  };
+
   return (
-    <Container className="mt-4">
+    <Container fluid className="mt-4 px-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2>📊 Reports</h2>
         <Button variant="outline-primary" size="sm" onClick={handleRefresh} disabled={loading}>
@@ -409,122 +541,193 @@ const Reports = () => {
         </div>
       )}
 
-      <Row>
-        <Col md={4}>
-          <h4 className="mb-3">Summary</h4>
-          <ListGroup>
-            <ListGroup.Item className="d-flex justify-content-between align-items-center">
-              <span>📄 Not Printed</span>
-              <span className="badge bg-secondary rounded-pill">{counts.not_printed}</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between align-items-center">
-              <span>✅ Printed Counts</span>
-              <span className="badge bg-success rounded-pill">{counts.printed}</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between align-items-center">
-              <span>🔄 Re-Printed Counts</span>
-              <span className="badge bg-warning rounded-pill">{counts.reprinted}</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between align-items-center">
-              <span>💰 Paid Counts</span>
-              <span className="badge bg-info rounded-pill">{counts.paid}</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between align-items-center">
-              <span>❌ Unpaid Counts</span>
-              <span className="badge bg-danger rounded-pill">{counts.unpaid}</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between align-items-center">
-              <span><strong>👥 Total Registrants</strong></span>
-              <span className="badge bg-primary rounded-pill">{counts.total}</span>
-            </ListGroup.Item>
-          </ListGroup>
-
-          <div className="mt-4">
-            <h5 className="mb-2">📥 Export Options</h5>
-            {search && (
-              <div className="alert alert-info py-2 px-3 mb-2">
-                <small>
-                  <strong>Filter active:</strong> "{search}"
-                  <br />
-                  Export will include {filteredRegistrations.length} filtered record(s)
-                </small>
+      {/* ✅ SUMMARY SECTION - TOP */}
+      <Card className="mb-4 shadow-sm">
+        <Card.Header className="bg-primary text-white">
+          <h5 className="mb-0">📊 Summary Statistics</h5>
+        </Card.Header>
+        <Card.Body>
+          <Row className="text-center">
+            <Col md={2}>
+              <div className="p-3 border rounded">
+                <h3 className="text-secondary mb-1">{hasActiveFilters ? calculateCounts(filteredRegistrations).not_printed : counts.not_printed}</h3>
+                <small className="text-muted">📄 Not Printed</small>
               </div>
-            )}
-            <div className="d-grid gap-2">
-              <Button 
-                variant="danger" 
-                onClick={exportToPDF} 
-                disabled={exporting || filteredRegistrations.length === 0}
-                size="lg"
-              >
-                {exporting ? (
-                  <>
-                    <Spinner animation="border" size="sm" className="me-2" />
-                    Generating PDF...
-                  </>
-                ) : (
-                  `📄 Export to PDF (${filteredRegistrations.length})`
-                )}
-              </Button>
-              <Button 
-                variant="success" 
-                onClick={exportToCSV} 
-                disabled={exporting || filteredRegistrations.length === 0}
-              >
-                {exporting ? (
-                  <>
-                    <Spinner animation="border" size="sm" className="me-2" />
-                    Generating CSV...
-                  </>
-                ) : (
-                  `📊 Export to CSV (${filteredRegistrations.length})`
-                )}
-              </Button>
-            </div>
-            {filteredRegistrations.length === 0 && (
-              <small className="text-muted d-block mt-2 text-center">
-                {search ? 'No matching records to export' : 'No data available'}
-              </small>
-            )}
-          </div>
-        </Col>
+            </Col>
+            <Col md={2}>
+              <div className="p-3 border rounded">
+                <h3 className="text-success mb-1">{hasActiveFilters ? calculateCounts(filteredRegistrations).printed : counts.printed}</h3>
+                <small className="text-muted">✅ Printed</small>
+              </div>
+            </Col>
+            <Col md={2}>
+              <div className="p-3 border rounded">
+                <h3 className="text-warning mb-1">{hasActiveFilters ? calculateCounts(filteredRegistrations).reprinted : counts.reprinted}</h3>
+                <small className="text-muted">🔄 Re-Printed</small>
+              </div>
+            </Col>
+            <Col md={2}>
+              <div className="p-3 border rounded">
+                <h3 className="text-info mb-1">{hasActiveFilters ? calculateCounts(filteredRegistrations).paid : counts.paid}</h3>
+                <small className="text-muted">💰 Paid</small>
+              </div>
+            </Col>
+            <Col md={2}>
+              <div className="p-3 border rounded">
+                <h3 className="text-danger mb-1">{hasActiveFilters ? calculateCounts(filteredRegistrations).unpaid : counts.unpaid}</h3>
+                <small className="text-muted">❌ Unpaid</small>
+              </div>
+            </Col>
+            <Col md={2}>
+              <div className="p-3 border rounded bg-primary text-white">
+                <h3 className="mb-1">{hasActiveFilters ? filteredRegistrations.length : counts.total}</h3>
+                <small>👥 Total</small>
+              </div>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
+      
 
-        <Col md={8}>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h4 className="mb-0">Registration List</h4>
-            <Badge bg="secondary">
-              {filteredRegistrations.length} of {allRegistrations.length} records
-            </Badge>
-          </div>
-          
-          {/* ✅ Instant Search Field (updated placeholder) */}
-          <InputGroup className="mb-3">
-            <InputGroup.Text>🔍</InputGroup.Text>
-            <Form.Control 
-              type="text" 
-              placeholder="Search: name, email, phone, ticket, type (onsite, online, pre-registered)..." 
-              value={search} 
-              onChange={handleSearchChange}
-              disabled={loading}
-            />
-            {search && (
-              <Button 
-                variant="outline-secondary" 
-                onClick={handleClearSearch}
-              >
-                ✕
-              </Button>
-            )}
-          </InputGroup>
+      {/* ✅ REPORTS SECTION */}
+      <Card className="mb-3 shadow-sm">
+        <Card.Header className="bg-success text-white">
+          <h5 className="mb-0">📋 Registration List</h5>
+        </Card.Header>
+        <Card.Body>
+          {/* ✅ FILTERS ROW */}
+          <Row className="mb-3">
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label className="small fw-bold">🔍 Search</Form.Label>
+                <InputGroup size="sm">
+                  <InputGroup.Text>🔍</InputGroup.Text>
+                  <Form.Control 
+                    type="text" 
+                    placeholder="Name, email, phone, type..." 
+                    value={search} 
+                    onChange={handleSearchChange}
+                    disabled={loading}
+                  />
+                  {search && (
+                    <Button 
+                      variant="outline-secondary" 
+                      onClick={handleClearSearch}
+                      size="sm"
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </InputGroup>
+              </Form.Group>
+            </Col>
 
-          {search && (
-            <div className="alert alert-success py-2 px-3 mb-3">
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="small fw-bold">📅 Date From</Form.Label>
+                <Form.Control 
+                  type="date" 
+                  size="sm"
+                  value={dateFrom} 
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  disabled={loading}
+                />
+              </Form.Group>
+            </Col>
+
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="small fw-bold">📅 Date To</Form.Label>
+                <Form.Control 
+                  type="date" 
+                  size="sm"
+                  value={dateTo} 
+                  onChange={(e) => setDateTo(e.target.value)}
+                  disabled={loading}
+                />
+              </Form.Group>
+            </Col>
+
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="small fw-bold">💰 Payment Status</Form.Label>
+                <Form.Select 
+                  size="sm"
+                  value={paymentFilter} 
+                  onChange={(e) => setPaymentFilter(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="both">Both</option>
+                  <option value="paid">Paid Only</option>
+                  <option value="unpaid">Unpaid Only</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+
+            <Col md={3} className="d-flex align-items-end">
+              <Button 
+                variant="outline-danger" 
+                size="sm" 
+                onClick={handleClearFilters}
+                disabled={!hasActiveFilters || loading}
+                className="w-100"
+              >
+                🗑️ Clear All Filters
+              </Button>
+            </Col>
+          </Row>
+
+          {/* ✅ COLUMN VISIBILITY CHECKBOXES */}
+          <Row className="mb-3">
+            <Col>
+              <div className="border rounded p-2 bg-light">
+                <small className="fw-bold d-block mb-2">👁️ Show/Hide Columns:</small>
+                <div className="d-flex flex-wrap gap-3">
+                  {Object.entries({
+                    id: 'ID',
+                    name: 'Name',
+                    email: 'Email',
+                    phone: 'Phone',
+                    address: 'Address',
+                    company: 'Company',
+                    type: 'Type',
+                    payment: 'Payment',
+                    badge: 'Badge',
+                    ticket: 'Ticket ID',
+                    date: 'Date'
+                  }).map(([key, label]) => (
+                    <Form.Check
+                      key={key}
+                      type="checkbox"
+                      id={`col-${key}`}
+                      label={label}
+                      checked={visibleColumns[key]}
+                      onChange={() => handleColumnToggle(key)}
+                      inline
+                      className="small"
+                    />
+                  ))}
+                </div>
+              </div>
+            </Col>
+          </Row>
+
+          {/* ✅ ACTIVE FILTERS DISPLAY */}
+          {hasActiveFilters && (
+            <div className="alert alert-info py-2 px-3 mb-3">
               <small>
-                ✅ Found <strong>{filteredRegistrations.length}</strong> result(s) for "<strong>{search}</strong>"
+                <strong>🔍 Active Filters:</strong>{' '}
+                {search && <Badge bg="primary" className="me-1">Search: {search}</Badge>}
+                {dateFrom && <Badge bg="secondary" className="me-1">From: {dateFrom}</Badge>}
+                {dateTo && <Badge bg="secondary" className="me-1">To: {dateTo}</Badge>}
+                {paymentFilter !== 'both' && <Badge bg="success" className="me-1">Payment: {paymentFilter}</Badge>}
+                <br />
+                <strong>Showing {filteredRegistrations.length} of {allRegistrations.length} records</strong>
               </small>
             </div>
           )}
 
+          {/* ✅ TABLE */}
           {loading ? (
             <div className="text-center p-5">
               <Spinner animation="border" variant="primary" />
@@ -536,56 +739,102 @@ const Reports = () => {
                 <Table striped bordered hover size="sm">
                   <thead className="table-dark">
                     <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Phone</th>
-                      <th>Type</th>
-                      <th>Payment</th>
-                      <th>Badge</th>
-                      <th>Ticket</th>
-                      <th>By</th>
-                      <th>Date</th>
+                      {visibleColumns.id && (
+                        <th 
+                          onClick={() => handleSort('id')} 
+                          style={{cursor: 'pointer'}}
+                          className="user-select-none"
+                        >
+                          ID {getSortIcon('id')}
+                        </th>
+                      )}
+                      {visibleColumns.name && (
+                        <th 
+                          onClick={() => handleSort('name')} 
+                          style={{cursor: 'pointer'}}
+                          className="user-select-none"
+                        >
+                          Name {getSortIcon('name')}
+                        </th>
+                      )}
+                      {visibleColumns.email && (
+                        <th 
+                          onClick={() => handleSort('email')} 
+                          style={{cursor: 'pointer'}}
+                          className="user-select-none"
+                        >
+                          Email {getSortIcon('email')}
+                        </th>
+                      )}
+                      {visibleColumns.phone && <th>Phone</th>}
+                      {visibleColumns.address && <th>Address</th>}
+                      {visibleColumns.company && <th>Company</th>}
+                      {visibleColumns.type && <th>Type</th>}
+                      {visibleColumns.payment && (
+                        <th 
+                          onClick={() => handleSort('payment')} 
+                          style={{cursor: 'pointer'}}
+                          className="user-select-none"
+                        >
+                          Payment {getSortIcon('payment')}
+                        </th>
+                      )}
+                      {visibleColumns.badge && <th>Badge</th>}
+                      {visibleColumns.ticket && <th>Ticket ID</th>}
+                      {visibleColumns.date && (
+                        <th 
+                          onClick={() => handleSort('date')} 
+                          style={{cursor: 'pointer'}}
+                          className="user-select-none"
+                        >
+                          Date {getSortIcon('date')}
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {currentRecords.length > 0 ? (
                       currentRecords.map((reg) => (
                         <tr key={reg.id}>
-                          <td>{reg.id}</td>
-                          <td>{reg.first_name} {reg.last_name}</td>
-                          <td><small>{reg.email}</small></td>
-                          <td>{reg.phone || 'N/A'}</td>
-                          <td>
-                            <Badge bg={getTypeBadgeColor(reg.registration_type)} className="text-capitalize">
-                              {formatRegistrationType(reg.registration_type)}
-                            </Badge>
-                          </td>
-                          <td>
-                            <span className={`badge ${reg.payment_status === 'paid' ? 'bg-success' : 'bg-danger'}`}>
-                              {reg.payment_status}
-                            </span>
-                          </td>
-                          <td><small>{reg.badge_status?.name || 'N/A'}</small></td>
-                          <td><small>{reg.ticket_status?.name || 'N/A'}</small></td>
-                          <td><small>{reg.registered_by?.name || 'System'}</small></td>
-                          <td><small>{new Date(reg.created_at).toLocaleDateString()}</small></td>
+                          {visibleColumns.id && <td>{reg.id}</td>}
+                          {visibleColumns.name && <td>{reg.first_name} {reg.last_name}</td>}
+                          {visibleColumns.email && <td><small>{reg.email}</small></td>}
+                          {visibleColumns.phone && <td>{reg.phone || 'N/A'}</td>}
+                          {visibleColumns.address && <td><small>{reg.address || 'N/A'}</small></td>}
+                          {visibleColumns.company && <td><small>{reg.company_name || 'N/A'}</small></td>}
+                          {visibleColumns.type && (
+                            <td>
+                              <Badge bg={getTypeBadgeColor(reg.registration_type)} className="text-capitalize">
+                                {formatRegistrationType(reg.registration_type)}
+                              </Badge>
+                            </td>
+                          )}
+                          {visibleColumns.payment && (
+                            <td>
+                              <span className={`badge ${reg.payment_status === 'paid' ? 'bg-success' : 'bg-danger'}`}>
+                                {reg.payment_status}
+                              </span>
+                            </td>
+                          )}
+                          {visibleColumns.badge && <td><small>{reg.badge_status?.name || 'N/A'}</small></td>}
+                          {visibleColumns.ticket && <td><small>#{reg.id}</small></td>}
+                          {visibleColumns.date && <td><small>{new Date(reg.created_at).toLocaleDateString()}</small></td>}
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="10" className="text-center text-muted py-4">
-                          {search ? (
+                        <td colSpan="11" className="text-center text-muted py-4">
+                          {hasActiveFilters ? (
                             <>
-                              🔍 No registrations found matching "<strong>{search}</strong>"
+                              🔍 No registrations found matching your filters
                               <br />
                               <Button 
                                 variant="link" 
                                 size="sm" 
-                                onClick={handleClearSearch}
+                                onClick={handleClearFilters}
                                 className="mt-2"
                               >
-                                Clear search and show all
+                                Clear all filters
                               </Button>
                             </>
                           ) : (
@@ -598,6 +847,7 @@ const Reports = () => {
                 </Table>
               </div>
 
+              {/* ✅ PAGINATION */}
               {totalPages > 1 && (
                 <div className="d-flex justify-content-between align-items-center mt-3">
                   <Button 
@@ -626,8 +876,75 @@ const Reports = () => {
               )}
             </>
           )}
-        </Col>
-      </Row>
+        </Card.Body>
+      </Card>
+
+      {/* ✅ EXPORT SECTION - BOTTOM */}
+      <Card className="shadow-sm">
+        <Card.Header className="bg-dark text-white">
+          <h5 className="mb-0">📥 Export Options</h5>
+        </Card.Header>
+        <Card.Body>
+          {hasActiveFilters && (
+            <div className="alert alert-warning py-2 px-3 mb-3">
+              <small>
+                <strong>⚠️ Export Notice:</strong> You have active filters. 
+                Export will include <strong>{filteredRegistrations.length}</strong> filtered record(s) only.
+              </small>
+            </div>
+          )}
+          
+          <Row>
+            <Col md={6}>
+              <Button 
+                variant="danger" 
+                onClick={exportToPDF} 
+                disabled={exporting || filteredRegistrations.length === 0}
+                size="lg"
+                className="w-100"
+              >
+                {exporting ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Generating PDF...
+                  </>
+                ) : (
+                  `📄 Export to PDF (${filteredRegistrations.length} records)`
+                )}
+              </Button>
+            </Col>
+              <Col md={6}>
+              <Button 
+                variant="success"
+                onClick={exportToCSV}
+                disabled={true}  // Always disabled
+                size="lg"
+                className="w-100"
+                style={{
+                  pointerEvents: 'none',  // Prevent all click events
+                  cursor: 'not-allowed',  // Show not-allowed cursor
+                  opacity: 0.6  // Optional: make it look visually disabled
+                }}
+              >
+                {exporting ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Generating CSV...
+                  </>
+                ) : (
+                  `📊 Export to CSV (${filteredRegistrations.length} records)`
+                )}
+              </Button>
+            </Col>
+          </Row>
+          
+          {filteredRegistrations.length === 0 && (
+            <small className="text-muted d-block mt-2 text-center">
+              {hasActiveFilters ? 'No matching records to export' : 'No data available'}
+            </small>
+          )}
+        </Card.Body>
+      </Card>
     </Container>
   );
 };

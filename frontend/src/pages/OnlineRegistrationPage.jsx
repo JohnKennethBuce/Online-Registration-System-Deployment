@@ -42,7 +42,7 @@ const styles = {
     border: "1px solid #e0e0e0",
     transition: "border-color 0.3s ease, box-shadow 0.3s ease",
     width: "100%",
-    boxSizing: "border-box", // Important for full width
+    boxSizing: "border-box",
   },
   // Base button style
   button: {
@@ -58,12 +58,9 @@ const styles = {
   },
   // Primary action button (Register)
   primaryButton: {
-    backgroundColor: "#007bff", // Primary Blue
+    backgroundColor: "#007bff",
     color: "#ffffff",
     boxShadow: "0 4px 10px rgba(0, 123, 255, 0.3)",
-    // Note: Hover effects will require a CSS file or a dedicated CSS-in-JS library to apply directly.
-    // For inline style, we can simulate the hover in a real application using useState/onMouseEnter/onMouseLeave.
-    // For this design-only request, we'll rely on the visual style.
   },
   // Disabled button style
   disabledButton: {
@@ -113,6 +110,109 @@ const styles = {
     color: "#6c757d",
     marginTop: "5px",
   },
+  // ✅ NEW: Confirmation Modal Styles
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+    padding: "20px",
+  },
+  modalContent: {
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
+    padding: "30px",
+    maxWidth: "500px",
+    width: "100%",
+    maxHeight: "90vh",
+    overflowY: "auto",
+    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+    animation: "slideIn 0.3s ease-out",
+  },
+  modalHeader: {
+    fontSize: "24px",
+    fontWeight: "700",
+    color: "#343a40",
+    marginBottom: "20px",
+    textAlign: "center",
+    borderBottom: "2px solid #e0e0e0",
+    paddingBottom: "15px",
+  },
+  infoSection: {
+    backgroundColor: "#f8f9fa",
+    padding: "20px",
+    borderRadius: "8px",
+    marginBottom: "20px",
+  },
+  infoRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "10px 0",
+    borderBottom: "1px solid #e0e0e0",
+  },
+  infoLabel: {
+    fontWeight: "600",
+    color: "#6c757d",
+    minWidth: "120px",
+  },
+  infoValue: {
+    color: "#212529",
+    textAlign: "right",
+    flex: 1,
+    wordBreak: "break-word",
+  },
+  warningBox: {
+    backgroundColor: "#fff3cd",
+    border: "2px solid #ffc107",
+    borderRadius: "8px",
+    padding: "15px",
+    marginBottom: "25px",
+  },
+  warningIcon: {
+    fontSize: "24px",
+    marginRight: "10px",
+    verticalAlign: "middle",
+  },
+  warningText: {
+    color: "#856404",
+    fontSize: "15px",
+    lineHeight: "1.5",
+  },
+  modalButtons: {
+    display: "flex",
+    gap: "15px",
+    justifyContent: "center",
+    marginTop: "25px",
+  },
+  confirmButton: {
+    backgroundColor: "#28a745",
+    color: "#ffffff",
+    padding: "12px 30px",
+    fontSize: "16px",
+    fontWeight: "600",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    boxShadow: "0 4px 10px rgba(40, 167, 69, 0.3)",
+  },
+  cancelButton: {
+    backgroundColor: "#6c757d",
+    color: "#ffffff",
+    padding: "12px 30px",
+    fontSize: "16px",
+    fontWeight: "600",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+  },
 };
 
 // ===========================================================
@@ -125,12 +225,108 @@ const useHover = (initialStyle, hoverStyle) => {
   return [style, onMouseEnter, onMouseLeave];
 };
 
+// ===========================================================
+// ✅ NEW: Confirmation Modal Component
+// ===========================================================
+const ConfirmationModal = ({ isOpen, formData, onConfirm, onCancel }) => {
+  if (!isOpen) return null;
+
+  // Format display values
+  const displayData = [
+    { label: "First Name", value: formData.first_name, required: true },
+    { label: "Last Name", value: formData.last_name, required: true },
+    { label: "Email", value: formData.email || "Not provided" },
+    { label: "Phone", value: formData.phone || "Not provided" },
+    { label: "Address", value: formData.address || "Not provided" },
+    { label: "Company", value: formData.company_name, required: true },
+  ];
+
+  return (
+    <div style={styles.modalOverlay} onClick={onCancel}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <h2 style={styles.modalHeader}>⚠️ Confirm Your Registration</h2>
+        
+        <div style={styles.infoSection}>
+          <h3 style={{ marginBottom: "15px", color: "#343a40" }}>Please review your information:</h3>
+          {displayData.map((item, index) => (
+            <div key={index} style={{
+              ...styles.infoRow,
+              borderBottom: index === displayData.length - 1 ? "none" : "1px solid #e0e0e0"
+            }}>
+              <span style={styles.infoLabel}>
+                {item.label}{item.required && <span style={{ color: "#dc3545" }}> *</span>}:
+              </span>
+              <span style={{
+                ...styles.infoValue,
+                fontWeight: item.required ? "600" : "normal",
+                color: item.value === "Not provided" ? "#6c757d" : "#212529"
+              }}>
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div style={styles.warningBox}>
+          <span style={styles.warningIcon}>⚠️</span>
+          <span style={styles.warningText}>
+            <strong>Important Notice:</strong><br />
+            Once you submit this registration, you <strong>CANNOT edit or modify</strong> your information. 
+            This device will also be locked and prevented from submitting another registration. 
+            Please ensure all information is correct before proceeding.
+          </span>
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+          <p style={{ fontSize: "16px", color: "#343a40", fontWeight: "500" }}>
+            Are you sure you want to proceed with this registration?
+          </p>
+        </div>
+
+        <div style={styles.modalButtons}>
+          <button
+            onClick={onCancel}
+            style={styles.cancelButton}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = "#5a6268";
+              e.target.style.transform = "translateY(-2px)";
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = "#6c757d";
+              e.target.style.transform = "translateY(0)";
+            }}
+          >
+            ← Go Back & Edit
+          </button>
+          <button
+            onClick={onConfirm}
+            style={styles.confirmButton}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = "#218838";
+              e.target.style.transform = "translateY(-2px)";
+              e.target.style.boxShadow = "0 6px 15px rgba(40, 167, 69, 0.4)";
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = "#28a745";
+              e.target.style.transform = "translateY(0)";
+              e.target.style.boxShadow = "0 4px 10px rgba(40, 167, 69, 0.3)";
+            }}
+          >
+            ✓ Yes, Submit Registration
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function OnlineRegistrationPage() {
   const [serverMode, setServerMode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
-  const [settings, setSettings] = useState(null); // Unused in this snippet, kept for state integrity
+  const [settings, setSettings] = useState(null);
   const [fadeOut, setFadeOut] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false); // ✅ NEW: Confirmation modal state
 
   const [form, setForm] = useState({
     first_name: "",
@@ -155,8 +351,8 @@ export default function OnlineRegistrationPage() {
   const [registerButtonStyle, registerOnMouseEnter, registerOnMouseLeave] = useHover(
     styles.primaryButton,
     { 
-        backgroundColor: "#0056b3", // Darker blue on hover
-        transform: "translateY(-2px)", // Slight lift
+        backgroundColor: "#0056b3",
+        transform: "translateY(-2px)",
         boxShadow: "0 6px 15px rgba(0, 123, 255, 0.45)" 
     }
   );
@@ -165,12 +361,12 @@ export default function OnlineRegistrationPage() {
   const [retryButtonStyle, retryOnMouseEnter, retryOnMouseLeave] = useHover(
     { ...styles.button, backgroundColor: "#6c757d", color: "#ffffff" },
     { 
-        backgroundColor: "#5a6268", // Darker gray on hover
-        transform: "scale(1.03)" // Slight scale up
+        backgroundColor: "#5a6268",
+        transform: "scale(1.03)"
     }
   );
 
-  // Function definitions (sleep, preloadImage, buildQrUrl, etc.) remain unchanged
+  // Function definitions remain unchanged
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
   const preloadImage = (src) =>
@@ -293,10 +489,24 @@ export default function OnlineRegistrationPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // ✅ UPDATED: Show confirmation modal instead of direct submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (locked) return;
 
+    // Basic validation
+    if (!form.first_name.trim() || !form.last_name.trim() || !form.company_name.trim()) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+
+    // Show confirmation modal
+    setShowConfirmation(true);
+  };
+
+  // ✅ NEW: Handle confirmed submission
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmation(false);
     setIsSubmitting(true);
     setError("");
     setSuccessfulReg(null);
@@ -334,11 +544,16 @@ export default function OnlineRegistrationPage() {
     }
   };
 
+  // ✅ NEW: Handle cancel confirmation
+  const handleCancelConfirmation = () => {
+    setShowConfirmation(false);
+  };
+
   /** 🕒 Auto-close success after fade */
   useEffect(() => {
     if (successfulReg) {
-      const fadeTimer = setTimeout(() => setFadeOut(true), 8000); // start fade after 8s
-      const closeTimer = setTimeout(() => window.close(), 30000); // close after 30s
+      const fadeTimer = setTimeout(() => setFadeOut(false), 50000000);
+      const closeTimer = setTimeout(() => window.close(), 50000000);
       return () => {
         clearTimeout(fadeTimer);
         clearTimeout(closeTimer);
@@ -354,15 +569,12 @@ export default function OnlineRegistrationPage() {
       <div style={{ ...styles.container, textAlign: "center" }}>
         <h2 style={{ color: "#007bff" }}>Preparing your QR code…</h2>
         <p style={{ ...styles.statusSubtext }}>Please wait while we generate your entry QR.</p>
-        {/*  */}
       </div>
     );
 
   if (successfulReg) {
     const refreshQr = async () => {
       if (!successfulReg?.ticket_number) return;
-      // Temporarily use the retry button style without full hover logic for simplicity
-      // In a real app, you would define state/logic for this button's hover too.
       await pollForQr(successfulReg.ticket_number, successfulReg);
     };
 
@@ -402,7 +614,8 @@ export default function OnlineRegistrationPage() {
         <h3 style={{ marginTop: 20, color: "#343a40" }}>
           {successfulReg.first_name} {successfulReg.last_name}
         </h3>
-        <p style={{ color: "#007bff", fontWeight: "bold" }}>Ticket Number: {successfulReg.ticket_number}</p>
+        <p style={{ color: "#007bff", fontWeight: "bold" }}>
+        Ticket ID: #{successfulReg.id}</p>
         <p style={{ marginTop: 16, color: "#777" }}>
           This device is now restricted from submitting another registration.
         </p>
@@ -485,7 +698,8 @@ export default function OnlineRegistrationPage() {
           name="company_name"
           value={form.company_name}
           onChange={handleChange}
-          placeholder="Company Name (Optional)"
+          placeholder="Company/Organization *"
+          required
           style={styles.input}
         />
         <button
@@ -502,6 +716,14 @@ export default function OnlineRegistrationPage() {
           {isSubmitting ? "Processing..." : "Register Now"}
         </button>
       </form>
+
+      {/* ✅ NEW: Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        formData={form}
+        onConfirm={handleConfirmedSubmit}
+        onCancel={handleCancelConfirmation}
+      />
     </div>
   );
 }

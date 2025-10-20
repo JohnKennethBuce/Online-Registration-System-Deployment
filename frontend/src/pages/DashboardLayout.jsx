@@ -3,9 +3,42 @@ import { Nav, Container, Row, Col } from 'react-bootstrap';
 import { useAuth } from "../context/AuthContext";
 import 'bootstrap/dist/css/bootstrap.min.css';
 
+// ===== NEW IMPORTS =====
+import { useState, useEffect } from 'react';
+import api from '../api/axios';
+
 function DashboardSidebar() {
   const { user } = useAuth();
   const location = useLocation();
+
+  // ===== NEW: LOGO FETCHING LOGIC =====
+  const [logoPath, setLogoPath] = useState('');
+  const backendUrl = api.defaults.baseURL.replace('/api', '');
+
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const res = await api.get('/settings');
+        if (res.data?.registration_logo_path) {
+          setLogoPath(res.data.registration_logo_path);
+        }
+      } catch (err) {
+        console.error('Failed to fetch logo for sidebar:', err);
+      }
+    };
+    fetchLogo();
+  }, []);
+
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    const normalized = String(path)
+      .replace(/\\/g, '/')
+      .replace(/^\/?storage\/?/i, '');
+    return `${backendUrl}/storage/${normalized}`;
+  };
+  // ===== END: NEW LOGIC =====
+
 
   const isActive = (path) => {
     if (path === '/dashboard') {
@@ -59,6 +92,8 @@ function DashboardSidebar() {
     <div 
       className="bg-white shadow-sm h-100"
       style={{ 
+        display: 'flex',
+        flexDirection: 'column',
         position: 'sticky',
         top: '0',
         padding: '20px',
@@ -66,51 +101,108 @@ function DashboardSidebar() {
         minHeight: '100vh'
       }}
     >
-      <h5 className="fw-bold mb-4 text-muted">DASHBOARD MENU</h5>
-      
-      <SidebarLink to="/dashboard" icon="📊">
-        Summary
-      </SidebarLink>
+      <div>
+        <h5 className="fw-bold mb-4 text-muted">DASHBOARD MENU</h5>
+        
+        <SidebarLink to="/dashboard" icon="📊">
+          Summary
+        </SidebarLink>
 
-      <SidebarLink to="/dashboard/registrations" icon="📋" permission="view-registrations">
-        Registrations
-      </SidebarLink>
+        <SidebarLink to="/dashboard/registrations" icon="📋" permission="view-registrations">
+          Registrations
+        </SidebarLink>
 
-      <SidebarLink to="/dashboard/register-new" icon="➕" permission="create-registration">
-        New Registration
-      </SidebarLink>
+        <SidebarLink to="/dashboard/register-new" icon="➕" permission="create-registration">
+          New Registration
+        </SidebarLink>
 
-      <SidebarLink to="/dashboard/scanner" icon="📷" permission="scan-registration">
-        QR Scanner
-      </SidebarLink>
+        <SidebarLink to="/dashboard/scanner" icon="📷" permission="scan-registration">
+          QR Scanner
+        </SidebarLink>
 
-      <SidebarLink to="/dashboard/reports" icon="📈" permission="view-reports">
-        Reports
-      </SidebarLink>
+        <SidebarLink to="/dashboard/reports" icon="📈" permission="view-reports">
+          Reports
+        </SidebarLink>
 
-      <hr className="my-4" />
+        <hr className="my-4" />
 
-      <h6 className="fw-bold mb-3 text-muted small">SETTINGS</h6>
+        <h6 className="fw-bold mb-3 text-muted small">SETTINGS</h6>
 
-      <SidebarLink to="/dashboard/settings" icon="⚙️" permission="edit-settings">
-        Badge Settings
-      </SidebarLink>
+        <SidebarLink to="/dashboard/settings" icon="⚙️" permission="edit-settings">
+          Badge Settings
+        </SidebarLink>
 
-      <SidebarLink to="/dashboard/server-mode" icon="🖥️" permission="edit-server-mode">
-        Server Mode
-      </SidebarLink>
+        <SidebarLink to="/dashboard/server-mode" icon="🖥️" permission="edit-server-mode">
+          Server Mode
+        </SidebarLink>
 
-      <hr className="my-4" />
+        <hr className="my-4" />
 
-      <h6 className="fw-bold mb-3 text-muted small">ADMINISTRATION</h6>
+        <h6 className="fw-bold mb-3 text-muted small">ADMINISTRATION</h6>
 
-      <SidebarLink to="/dashboard/user-management" icon="👥" permission="view-users">
-        User Management
-      </SidebarLink>
+        <SidebarLink to="/dashboard/user-management" icon="👥" permission="view-users">
+          User Management
+        </SidebarLink>
 
-      <SidebarLink to="/dashboard/role-management" icon="🔐" permission="manage-roles">
-        Role Management
-      </SidebarLink>
+        <SidebarLink to="/dashboard/role-management" icon="🔐" permission="manage-roles">
+          Role Management
+        </SidebarLink>
+      </div>
+
+      {/* ===== START: UPDATED FOOTER DESIGN ===== */}
+      <div 
+        style={{
+          marginTop: 'auto',
+          paddingTop: '1rem',
+          borderTop: '1px solid #dee2e6',
+          display: 'flex', // Use flexbox for alignment
+          alignItems: 'center', // Vertically center items
+          justifyContent: 'center', // Horizontally center content
+          gap: '0.75rem', // Space between logo and text
+        }}
+      >
+        {/* Conditionally render the logo */}
+        {logoPath && (
+          <img 
+            src={getImageUrl(logoPath)} 
+            alt="Company Logo"
+            style={{
+              height: '30px',
+              width: 'auto',
+              maxWidth: '40px',
+              objectFit: 'contain'
+            }}
+          />
+        )}
+
+        {/* Text container */}
+        <div style={{ textAlign: 'left' }}>
+          <span style={{ 
+            display: 'block', 
+            fontSize: '0.75rem', 
+            color: '#6c757d',
+            lineHeight: 1.2
+          }}>
+            ⏻ Powered By
+          </span>
+          <a 
+            href="https://heritagemultioffice.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ 
+              color: '#343a40',
+              fontWeight: '600',
+              fontSize: '0.8rem',
+              textDecoration: 'none',
+              lineHeight: 1.2
+            }}
+          >
+            Heritage Multi Office Product Inc.
+          </a>
+        </div>
+      </div>
+      {/* ===== END: UPDATED FOOTER DESIGN ===== */}
+
     </div>
   );
 }

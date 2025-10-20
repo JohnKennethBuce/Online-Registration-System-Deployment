@@ -154,7 +154,7 @@ export default function SettingsPage() {
 
                 <Form.Group className="mb-4">
                   <Form.Label className="fw-semibold">
-                    🎪 Event Name
+                    ⌛ Event Duration Day
                   </Form.Label>
                   <Form.Control
                     type="text"

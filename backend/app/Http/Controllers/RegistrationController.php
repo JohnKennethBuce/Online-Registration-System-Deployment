@@ -30,91 +30,99 @@ class RegistrationController extends Controller
     }
 
     public function store(Request $request): JsonResponse
-        {
-            $validated = $request->validate([
-                'first_name' => 'required|string|max:255',
-                'last_name' => 'required|string|max:255',
-                'email' => 'nullable|email|max:255|unique:registrations,email',
-                'phone' => 'nullable|string|max:20',
-                'address' => 'nullable|string|max:255',
-                'company_name' => 'nullable|string|max:255',
-                'registration_type' => 'required|in:onsite,online,pre-registered',
-                'payment_status' => 'nullable|in:unpaid,paid',
-            ]);
-        
-            // Check for duplicate email hash (only if email is provided)
-            $emailHash = null;
-            if (!empty($validated['email'])) {
-                $emailHash = hash('sha256', strtolower(trim($validated['email'])));
-                if (Registration::where('email_hash', $emailHash)->exists()) {
-                    return response()->json(['error' => 'This email address is already registered.'], 409);
-                }
-            }
-        
-            // Get current server mode (needed for registration record)
-            $serverMode = ServerMode::latest()->first();
-            if (!$serverMode) {
-                return response()->json(['error' => 'Server mode not configured.'], 500);
-            }
-        
-            // ServerMode validation - Skip for pre-registered ✅ CORRECT!
-            if ($validated['registration_type'] !== 'pre-registered') {
-                $allowedTypes = explode(',', str_replace('both', 'onsite,online', $serverMode->mode));
-                if (!in_array($validated['registration_type'], $allowedTypes)) {
-                    return response()->json(['error' => 'Registration type not allowed in current mode'], 400);
-                }
-            }
-        
-            // PrintStatus setup
-            $badgeNotPrinted = PrintStatus::where('type', 'badge')->where('name', 'not_printed')->first();
-            $ticketNotPrinted = PrintStatus::where('type', 'ticket')->where('name', 'not_printed')->first();
-            if (!$badgeNotPrinted || !$ticketNotPrinted) {
-                return response()->json(['error' => 'Print statuses not configured.'], 500);
-            }
-        
-            // Create Registration
-            $ticketNumber = 'TICKET-' . strtoupper(Str::random(12));
-            $registration = Registration::create([
-                'first_name' => $validated['first_name'],
-                'last_name' => $validated['last_name'],
-                'email' => $validated['email'],
-                'email_hash' => $emailHash, // Will be null if no email provided
-                'phone' => $validated['phone'],
-                'address' => $validated['address'],
-                'company_name' => $validated['company_name'],
-                'registration_type' => $validated['registration_type'],
-                'server_mode' => $serverMode->mode,
-                'badge_printed_status_id' => $badgeNotPrinted->id,
-                'ticket_printed_status_id' => $ticketNotPrinted->id,
-                'ticket_number' => $ticketNumber,
-                'registered_by' => Auth::id(),
-                'payment_status' => $validated['payment_status'] ?? 'unpaid',
-            ]);
-        
-            // Dispatch QR code generation job
-            (new GenerateQrCode($registration))->handle();
-        
-            Log::info('Registration created and QR job dispatched', [
-                'ticket_number' => $ticketNumber,
-                'user_id' => Auth::id(),
-                'mode' => $serverMode->mode,
-                'type' => $validated['registration_type']
-            ]);
-            
-            $fresh = $registration->fresh();
-            
-            // Normalize path and build a web URL if available
-            $qrUrl = $fresh->qr_code_path
-                ? asset('storage/' . ltrim(str_replace('\\', '/', $fresh->qr_code_path), '/'))
-                : null;
-            
-            return response()->json([
-                'message' => 'Registration successful. The QR code will be generated shortly.',
-                'registration' => array_merge($fresh->toArray(), [
-                    'qr_url' => $qrUrl,
-                ]),
-            ], 201);
+    {
+        // 🎨 UPDATED: Removed the incorrect 'unique' validation rules for encrypted name fields.
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255', // The email_hash check below handles uniqueness.
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'company_name' => 'nullable|string|max:255', // 'required' is not needed with 'nullable'.
+            'registration_type' => 'required|in:onsite,online,pre-registered',
+            'payment_status' => 'nullable|in:unpaid,paid',
+        ]);
+
+        // ✅ NEW: Manual uniqueness check for the full name combination.
+        // This is required because the database cannot enforce uniqueness on encrypted columns.
+        // ⚠️ WARNING: On very large datasets (10,000+), this could become slow as it decrypts names in memory.
+        $firstName = $validated['first_name'];
+        $lastName = $validated['last_name'];
+        $existing = Registration::all()->first(function ($registration) use ($firstName, $lastName) {
+            // Use accessors to compare decrypted values case-insensitively.
+            return strtolower($registration->first_name) === strtolower($firstName) &&
+                   strtolower($registration->last_name) === strtolower($lastName);
+        });
+
+        if ($existing) {
+            return response()->json(['error' => 'A registration with this first and last name already exists.'], 409); // 409 Conflict
         }
+    
+        // Check for duplicate email hash
+        $emailHash = null;
+        if (!empty($validated['email'])) {
+            $emailHash = hash('sha256', strtolower(trim($validated['email'])));
+            if (Registration::where('email_hash', $emailHash)->exists()) {
+                return response()->json(['error' => 'This email address is already registered.'], 409);
+            }
+        }
+    
+        // Get current server mode (needed for registration record)
+        $serverMode = ServerMode::latest()->first();
+        if (!$serverMode) {
+            return response()->json(['error' => 'Server mode not configured.'], 500);
+        }
+    
+        // ServerMode validation
+        if ($validated['registration_type'] !== 'pre-registered') {
+            $allowedTypes = explode(',', str_replace('both', 'onsite,online', $serverMode->mode));
+            if (!in_array($validated['registration_type'], $allowedTypes)) {
+                return response()->json(['error' => 'Registration type not allowed in current mode'], 400);
+            }
+        }
+    
+        // PrintStatus setup
+        $badgeNotPrinted = PrintStatus::where('type', 'badge')->where('name', 'not_printed')->first();
+        $ticketNotPrinted = PrintStatus::where('type', 'ticket')->where('name', 'not_printed')->first();
+        if (!$badgeNotPrinted || !$ticketNotPrinted) {
+            return response()->json(['error' => 'Print statuses not configured.'], 500);
+        }
+    
+        // Create Registration
+        $ticketNumber = 'TICKET-' . strtoupper(Str::random(12));
+        $registration = Registration::create([
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'email' => $validated['email'],
+            'email_hash' => $emailHash,
+            'phone' => $validated['phone'],
+            'address' => $validated['address'],
+            'company_name' => $validated['company_name'],
+            'registration_type' => $validated['registration_type'],
+            'server_mode' => $serverMode->mode,
+            'badge_printed_status_id' => $badgeNotPrinted->id,
+            'ticket_printed_status_id' => $ticketNotPrinted->id,
+            'ticket_number' => $ticketNumber,
+            'registered_by' => Auth::id(),
+            'payment_status' => $validated['payment_status'] ?? 'unpaid',
+        ]);
+    
+        // Dispatch QR code generation job
+        (new GenerateQrCode($registration))->handle();
+    
+        Log::info('Registration created and QR job dispatched', [
+            'ticket_number' => $ticketNumber, 'user_id' => Auth::id(), 'mode' => $serverMode->mode, 'type' => $validated['registration_type']
+        ]);
+        
+        $fresh = $registration->fresh(['badgeStatus', 'ticketStatus', 'registeredBy:id,name']);
+        
+        $qrUrl = $fresh->qr_code_path ? asset('storage/' . ltrim(str_replace('\\', '/', $fresh->qr_code_path), '/')) : null;
+        
+        return response()->json([
+            'message' => 'Registration successful. The QR code will be generated shortly.',
+            'registration' => array_merge($fresh->toArray(), ['qr_url' => $qrUrl,]),
+        ], 201);
+    }
         
         public function show($ticketNumber): JsonResponse
             {
@@ -125,38 +133,77 @@ class RegistrationController extends Controller
                 ]);
             }
 
-       public function update(Request $request, Registration $registration)
-            {
-                $validated = $request->validate([
-                    'first_name' => 'required|string|max:255',
-                    'last_name' => 'required|string|max:255',
-                    'email' => ['nullable', 'email', 'max:255', Rule::unique('registrations')->ignore($registration->id)],
-                    'phone' => 'nullable|string|max:20',
-                    'address' => 'nullable|string|max:255',
-                    'company_name' => 'nullable|string|max:255',
-                    'registration_type' => 'required|in:onsite,online,pre-registered',
-                    'payment_status' => 'nullable|in:unpaid,paid',
-                ]);
+    public function update(Request $request, Registration $registration)
+    {
+        // 🎨 UPDATED: Removed incorrect 'unique' validation and 'payment_status'.
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('registrations')->ignore($registration->id)],
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'company_name' => 'nullable|string|max:255',
+            'registration_type' => 'required|in:onsite,online,pre-registered',
+        ]);
 
-                // Update the email_hash if the email has changed
-                if ($registration->email !== $validated['email']) {
-                    // This logic ensures that if the email is cleared, the hash becomes null.
-                    if (!empty($validated['email'])) {
-                        $validated['email_hash'] = hash('sha256', strtolower(trim($validated['email'])));
-                    } else {
-                        $validated['email_hash'] = null;
-                    }
-                }
+        // ✅ NEW: Manual uniqueness check for the full name combination on update.
+        $firstName = $validated['first_name'];
+        $lastName = $validated['last_name'];
+        
+        // Find any OTHER registration with the same full name.
+        $existing = Registration::where('id', '!=', $registration->id)->get()
+            ->first(function ($otherReg) use ($firstName, $lastName) {
+                return strtolower($otherReg->first_name) === strtolower($firstName) &&
+                       strtolower($otherReg->last_name) === strtolower($lastName);
+            });
 
-                // The model's accessors/mutators will handle encryption automatically
-                $registration->update($validated);
+        if ($existing) {
+            return response()->json(['error' => 'Another registration with this first and last name already exists.'], 409);
+        }
 
-                return response()->json($registration->fresh());
-            }
+        // Update the email_hash if the email has changed
+        if ($registration->email !== $validated['email']) {
+            $validated['email_hash'] = !empty($validated['email']) ? hash('sha256', strtolower(trim($validated['email']))) : null;
+        }
+
+        // The model's accessors/mutators will handle encryption automatically
+        $registration->update($validated);
+
+        return response()->json($registration->fresh(['badgeStatus', 'ticketStatus', 'registeredBy:id,name']));
+    }
+
+    /**
+     * Toggles the payment status of a registration.
+     */
+    public function togglePaymentStatus(Registration $registration): JsonResponse
+    {
+        try {
+            $newStatus = $registration->payment_status === 'paid' ? 'unpaid' : 'paid';
+
+            $registration->update(['payment_status' => $newStatus]);
             
-        /**
-         * Delete a registration.
-         */
+            Log::info('Payment status toggled', [
+                'registration_id' => $registration->id,
+                'new_status' => $newStatus,
+                'user_id' => Auth::id()
+            ]);
+
+            // Return the entire fresh model so the frontend can update its state
+            return response()->json($registration->fresh(['badgeStatus', 'ticketStatus', 'registeredBy:id,name']));
+
+        } catch (\Exception $e) {
+            Log::error('Failed to toggle payment status', [
+                'registration_id' => $registration->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json(['error' => 'Could not update payment status'], 500);
+        }
+    }
+
+    /**
+     * Delete a registration.
+     */
         public function destroy(Registration $registration)
             {
                 $registration->delete();

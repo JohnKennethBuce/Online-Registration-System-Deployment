@@ -13,6 +13,7 @@ export default function Registrations() {
   const [printingId, setPrintingId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRegistration, setEditingRegistration] = useState(null);
+  const [togglingPaymentId, setTogglingPaymentId] = useState(null); // ✅ NEW: Track which payment is being toggled
 
   const backendBase = api.defaults.baseURL;
 
@@ -21,6 +22,9 @@ export default function Registrations() {
     user &&
     ["admin", "superadmin"].includes(user.role?.name) &&
     user.role?.permissions?.includes("view-registrations");
+
+  // ✅ Check if user can edit registrations (for payment toggle)
+  const canEdit = user?.role?.permissions?.includes("edit-registration");
 
   // ✅ Format registration type for display
   const formatRegistrationType = (type) => {
@@ -58,6 +62,46 @@ export default function Registrations() {
   useEffect(() => {
     if (isAuthorized) fetchRegistrations();
   }, [isAuthorized]);
+
+  // ✅ NEW: Handle payment status toggle
+  const handleTogglePayment = async (registration) => {
+    if (!canEdit) {
+      alert("You don't have permission to change payment status.");
+      return;
+    }
+
+    const confirmMsg = registration.payment_status === 'paid' 
+      ? `Mark this registration as UNPAID?\n\nName: ${registration.first_name} ${registration.last_name}\nCompany: ${registration.company_name || 'N/A'}`
+      : `Mark this registration as PAID?\n\nName: ${registration.first_name} ${registration.last_name}\nCompany: ${registration.company_name || 'N/A'}`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setTogglingPaymentId(registration.id);
+    setError(null);
+
+    try {
+      const response = await api.put(`/registrations/${registration.id}/toggle-payment`);
+      
+      // Update the registration in the local state with the returned data
+      setRegistrations(prevRegs => 
+        prevRegs.map(reg => 
+          reg.id === registration.id ? response.data : reg
+        )
+      );
+
+      // Show success feedback
+      const newStatus = response.data.payment_status;
+      alert(`Payment status updated to ${newStatus.toUpperCase()}`);
+
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || "Failed to update payment status";
+      setError(errorMsg);
+      alert(errorMsg);
+      console.error("Payment toggle failed:", err.response || err);
+    } finally {
+      setTogglingPaymentId(null);
+    }
+  };
 
   const handleEditClick = (reg) => {
     setEditingRegistration(reg);
@@ -184,6 +228,11 @@ export default function Registrations() {
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ width: "14px", height: "14px", backgroundColor: "#dc3545", borderRadius: "3px" }}></span> Unpaid
           </span>
+          {canEdit && (
+            <span style={{ fontSize: "0.85rem", fontStyle: "italic", color: "#666" }}>
+              (Click payment badge to toggle)
+            </span>
+          )}
           <span style={{ margin: "0 10px", color: "#ddd" }}>|</span>
           {/* Badge Status */}
           <span style={{ fontWeight: "bold", color: "#6c757d" }}>Not Printed</span>
@@ -283,9 +332,10 @@ export default function Registrations() {
                     </span>
                   </td>
 
-                  {/* Payment Status */}
+                  {/* ✅ UPDATED: Payment Status - Now clickable if user has edit permission */}
                   <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
                     <span
+                      onClick={() => canEdit && handleTogglePayment(reg)}
                       style={{
                         padding: "6px 12px", 
                         borderRadius: "20px", 
@@ -293,9 +343,31 @@ export default function Registrations() {
                         backgroundColor: reg.payment_status === "paid" ? "#28a745" : "#dc3545",
                         fontSize: "0.9rem", 
                         fontWeight: "bold",
+                        cursor: canEdit ? "pointer" : "default",
+                        opacity: togglingPaymentId === reg.id ? 0.6 : 1,
+                        transition: "all 0.3s",
+                        display: "inline-block",
+                        userSelect: "none",
+                        border: canEdit ? "2px solid transparent" : "none",
                       }}
+                      onMouseOver={(e) => {
+                        if (canEdit && togglingPaymentId !== reg.id) {
+                          e.target.style.border = "2px solid #fff";
+                          e.target.style.transform = "scale(1.05)";
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (canEdit) {
+                          e.target.style.border = "2px solid transparent";
+                          e.target.style.transform = "scale(1)";
+                        }
+                      }}
+                      title={canEdit ? `Click to toggle payment status` : reg.payment_status?.toUpperCase() || "UNPAID"}
                     >
-                      {reg.payment_status?.toUpperCase() || "UNPAID"}
+                      {togglingPaymentId === reg.id 
+                        ? "..." 
+                        : (reg.payment_status?.toUpperCase() || "UNPAID")
+                      }
                     </span>
                   </td>
                   

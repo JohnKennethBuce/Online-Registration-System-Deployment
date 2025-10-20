@@ -149,5 +149,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
             ->middleware('can:edit-registration');
         Route::delete('/{registration}', [RegistrationController::class, 'destroy'])
             ->middleware('can:delete-registration');
+
+                // ✅ NEW: Add this route for toggling payment status
+        Route::put('/{registration}/toggle-payment', [RegistrationController::class, 'togglePaymentStatus'])
+            ->middleware('can:edit-registration');
     });
 });

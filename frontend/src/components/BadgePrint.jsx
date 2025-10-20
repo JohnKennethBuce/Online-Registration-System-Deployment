@@ -24,7 +24,7 @@ export default function BadgePrint({ settings, registration, showQr = false }) {
   style={{
     width: "7.5cm", // Default width; adjust this value as needed
     height: "7.5cm", // Default height; adjust this value as needed
-    paddingTop: "10px",    // Default top padding; adjust this value as needed
+    paddingTop: "5px",    // Default top padding; adjust this value as needed
     paddingRight: "5px",  // Default right padding; adjust this value as needed
     paddingBottom: "120px", // Default bottom padding; adjust this value as needed
     paddingLeft: "40px",   // Default left padding; adjust this value as needed
@@ -43,9 +43,9 @@ export default function BadgePrint({ settings, registration, showQr = false }) {
       {/* HEADER */} 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", marginBottom: "3px" }}> 
         {mainLogo && (
-          <img src={mainLogo} alt="Main Logo" style={{ maxWidth: "60px", maxHeight: "50px" }} /> 
+          <img src={mainLogo} alt="Main Logo" style={{ maxWidth: "52px", maxHeight: "52px" }} /> 
         )}
-        <div style={{ textAlign: "left", fontSize: "12px", lineHeight: "1.2" }}>  
+        <div style={{ textAlign: "left", fontSize: "9px", lineHeight: "1.2" }}>  
           <div>{settings.event_location || "Event Location"}</div> 
           <div>{settings.event_datetime || "Event Date & Time"}</div>
         </div>
@@ -92,11 +92,11 @@ export default function BadgePrint({ settings, registration, showQr = false }) {
         </div>
         <div>
           <strong>Event Manager:</strong><br />
-          {mgrLogo && <img src={mgrLogo} alt="Manager" style={{ maxHeight: "20px" }} />}
+          {mgrLogo && <img src={mgrLogo} alt="Manager" style={{ maxHeight: "30px" }} />}
         </div>
         <div>
           <strong>Registration:</strong><br />
-          {regLogo && <img src={regLogo} alt="Registration" style={{ maxHeight: "20px" }} />}
+          {regLogo && <img src={regLogo} alt="Registration" style={{ maxHeight: "30px" }} />}
         </div>
       </div>
     </div>
