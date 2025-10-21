@@ -6,14 +6,23 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Registrations() {
   const { user, loading: authLoading } = useAuth();
-  const [registrations, setRegistrations] = useState([]);
-  const [pagination, setPagination] = useState(null);
+  
+  // ✅ NEW: Separate all data from filtered data
+  const [allRegistrations, setAllRegistrations] = useState([]);
+  const [filteredRegistrations, setFilteredRegistrations] = useState([]);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [printingId, setPrintingId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRegistration, setEditingRegistration] = useState(null);
-  const [togglingPaymentId, setTogglingPaymentId] = useState(null); // ✅ NEW: Track which payment is being toggled
+  const [togglingPaymentId, setTogglingPaymentId] = useState(null);
+  
+  // ✅ NEW: Search and sorting states
+  const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(15);
 
   const backendBase = api.defaults.baseURL;
 
@@ -29,7 +38,6 @@ export default function Registrations() {
   // ✅ Format registration type for display
   const formatRegistrationType = (type) => {
     if (!type) return 'N/A';
-    // Convert pre-registered to Pre-Registered, onsite to Onsite, online to Online
     return type.split('-').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join('-');
@@ -45,25 +53,221 @@ export default function Registrations() {
     }
   };
 
-  // --- Fetch registrations ---
-  const fetchRegistrations = async (url = "/registrations") => {
+  // ✅ Fetch ALL registrations once
+  const fetchAllRegistrations = async () => {
     setLoading(true);
     try {
-      const res = await api.get(url);
-      setRegistrations(res.data.data);
-      setPagination({ links: res.data.links, meta: res.data.meta });
+      const res = await api.get("/registrations", { 
+        params: { all: true } // Request all data at once
+      });
+      
+      const data = res.data.data || res.data || [];
+      console.log('✅ Loaded all registrations:', data.length);
+      
+      setAllRegistrations(data);
+      setFilteredRegistrations(data);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load registrations");
+      setAllRegistrations([]);
+      setFilteredRegistrations([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ Load data on mount
   useEffect(() => {
-    if (isAuthorized) fetchRegistrations();
+    if (isAuthorized) {
+      fetchAllRegistrations();
+    }
   }, [isAuthorized]);
 
-  // ✅ NEW: Handle payment status toggle
+  // ✅ Filter and sort whenever search or sortOrder changes
+  useEffect(() => {
+    filterAndSortData();
+    setCurrentPage(1); // Reset to first page when filtering
+  }, [search, sortOrder, allRegistrations]);
+
+  // ✅ Client-side filter and sort function
+  const filterAndSortData = () => {
+    let filtered = [...allRegistrations];
+
+    // 1. Apply search filter
+    if (search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filtered = filtered.filter(reg => {
+        const firstName = (reg.first_name || '').toLowerCase();
+        const lastName = (reg.last_name || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`;
+        const email = (reg.email || '').toLowerCase();
+        const company = (reg.company_name || '').toLowerCase();
+        const ticket = (reg.ticket_number || '').toLowerCase();
+        const type = (reg.registration_type || '').toLowerCase();
+        const payment = (reg.payment_status || '').toLowerCase();
+        
+        return firstName.includes(searchLower)
+          || lastName.includes(searchLower)
+          || fullName.includes(searchLower)
+          || email.includes(searchLower)
+          || company.includes(searchLower)
+          || ticket.includes(searchLower)
+          || type.includes(searchLower)
+          || payment.includes(searchLower);
+      });
+    }
+
+    // 2. Apply sorting by ID
+    filtered.sort((a, b) => {
+      const aVal = a.id || 0;
+      const bVal = b.id || 0;
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+
+    console.log(`🔍 Filtered: ${filtered.length} from ${allRegistrations.length} total`);
+    setFilteredRegistrations(filtered);
+  };
+
+  // ✅ Handle search input
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+  };
+
+  // ✅ Clear search
+  const handleClearSearch = () => {
+    setSearch('');
+  };
+
+  // ✅ Toggle sort order
+  const handleToggleSort = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
+  // ✅ Pagination calculations
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = filteredRegistrations.slice(indexOfFirstRecord, indexOfLastRecord);
+  const totalPages = Math.ceil(filteredRegistrations.length / recordsPerPage);
+
+  // ✅ Render pagination
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const items = [];
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    return (
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        marginTop: "20px",
+        flexWrap: "wrap",
+        gap: "15px"
+      }}>
+        <div style={{ fontSize: "0.9rem", color: "#6c757d" }}>
+          Showing <strong>{indexOfFirstRecord + 1}</strong> to{' '}
+          <strong>{Math.min(indexOfLastRecord, filteredRegistrations.length)}</strong> of{' '}
+          <strong>{filteredRegistrations.length}</strong> registrations
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+            style={{
+              ...paginationButtonStyle,
+              opacity: currentPage === 1 ? 0.5 : 1,
+              cursor: currentPage === 1 ? "not-allowed" : "pointer"
+            }}
+          >
+            ⏮ First
+          </button>
+
+          <button
+            onClick={() => setCurrentPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            style={{
+              ...paginationButtonStyle,
+              opacity: currentPage === 1 ? 0.5 : 1,
+              cursor: currentPage === 1 ? "not-allowed" : "pointer"
+            }}
+          >
+            ← Previous
+          </button>
+
+          {startPage > 1 && (
+            <>
+              <button onClick={() => setCurrentPage(1)} style={paginationButtonStyle}>
+                1
+              </button>
+              {startPage > 2 && <span style={{ padding: "0 8px", color: "#6c757d" }}>...</span>}
+            </>
+          )}
+
+          {[...Array(endPage - startPage + 1)].map((_, idx) => {
+            const pageNum = startPage + idx;
+            return (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                style={{
+                  ...paginationButtonStyle,
+                  ...(pageNum === currentPage ? activePaginationButtonStyle : {})
+                }}
+              >
+                {pageNum}
+              </button>
+            );
+          })}
+
+          {endPage < totalPages && (
+            <>
+              {endPage < totalPages - 1 && <span style={{ padding: "0 8px", color: "#6c757d" }}>...</span>}
+              <button onClick={() => setCurrentPage(totalPages)} style={paginationButtonStyle}>
+                {totalPages}
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={() => setCurrentPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            style={{
+              ...paginationButtonStyle,
+              opacity: currentPage === totalPages ? 0.5 : 1,
+              cursor: currentPage === totalPages ? "not-allowed" : "pointer"
+            }}
+          >
+            Next →
+          </button>
+
+          <button
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+            style={{
+              ...paginationButtonStyle,
+              opacity: currentPage === totalPages ? 0.5 : 1,
+              cursor: currentPage === totalPages ? "not-allowed" : "pointer"
+            }}
+          >
+            Last ⏭
+          </button>
+        </div>
+
+        <div style={{ fontSize: "0.9rem", color: "#6c757d" }}>
+          Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+        </div>
+      </div>
+    );
+  };
+
+  // ✅ Handle payment status toggle
   const handleTogglePayment = async (registration) => {
     if (!canEdit) {
       alert("You don't have permission to change payment status.");
@@ -82,14 +286,15 @@ export default function Registrations() {
     try {
       const response = await api.put(`/registrations/${registration.id}/toggle-payment`);
       
-      // Update the registration in the local state with the returned data
-      setRegistrations(prevRegs => 
-        prevRegs.map(reg => 
-          reg.id === registration.id ? response.data : reg
-        )
+      // Update in both arrays
+      const updatedData = response.data;
+      setAllRegistrations(prevRegs => 
+        prevRegs.map(reg => reg.id === registration.id ? updatedData : reg)
+      );
+      setFilteredRegistrations(prevRegs => 
+        prevRegs.map(reg => reg.id === registration.id ? updatedData : reg)
       );
 
-      // Show success feedback
       const newStatus = response.data.payment_status;
       alert(`Payment status updated to ${newStatus.toUpperCase()}`);
 
@@ -113,8 +318,7 @@ export default function Registrations() {
       await api.put(`/registrations/${updatedReg.id}`, updatedReg);
       setIsModalOpen(false);
       setEditingRegistration(null);
-      const currentPage = pagination?.meta?.current_page;
-      fetchRegistrations(currentPage ? `/registrations?page=${currentPage}` : "/registrations");
+      fetchAllRegistrations(); // Reload all data
     } catch (error) {
       alert("Failed to update registration. See console for details.");
       console.error("Update failed:", error.response || error);
@@ -127,12 +331,14 @@ export default function Registrations() {
         const response = await api.delete(`/registrations/${regId}`);
         if (response.status === 204) {
           alert("Registration deleted successfully.");
-          const currentPage = pagination?.meta?.current_page;
-          const prevPageLink = pagination?.links?.prev;
-          if (registrations.length === 1 && currentPage > 1) {
-            fetchRegistrations(prevPageLink || `/registrations?page=${currentPage - 1}`);
-          } else {
-            fetchRegistrations(currentPage ? `/registrations?page=${currentPage}` : "/registrations");
+          
+          // Remove from both arrays
+          setAllRegistrations(prev => prev.filter(reg => reg.id !== regId));
+          setFilteredRegistrations(prev => prev.filter(reg => reg.id !== regId));
+          
+          // Adjust current page if needed
+          if (currentRecords.length === 1 && currentPage > 1) {
+            setCurrentPage(currentPage - 1);
           }
         }
       } catch (error) {
@@ -157,8 +363,7 @@ export default function Registrations() {
       } else {
         window.open(badgeUrl, "_blank");
       }
-      const currentPage = pagination?.meta?.current_page;
-      fetchRegistrations(currentPage ? `/registrations?page=${currentPage}` : "/registrations");
+      fetchAllRegistrations(); // Reload data after printing
     } catch (err) {
       if (printWin) {
         try { printWin.close(); } catch (_) {}
@@ -186,6 +391,24 @@ export default function Registrations() {
     }
   };
 
+  // --- Button styles ---
+  const paginationButtonStyle = {
+    padding: "8px 12px",
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+    transition: "all 0.3s"
+  };
+
+  const activePaginationButtonStyle = {
+    backgroundColor: "#0056b3",
+    fontWeight: "bold",
+    boxShadow: "0 2px 8px rgba(0,91,187,0.4)"
+  };
+
   // --- UI Rendering ---
   if (authLoading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555" }}>⏳ Checking authorization...</p>;
   if (!user) return <p style={{ color: "red", padding: "20px", textAlign: "center", fontSize: "1.2rem" }}>🔒 You must be logged in to view this page.</p>;
@@ -197,16 +420,161 @@ export default function Registrations() {
     );
 
   if (loading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555" }}>⏳ Loading registrations...</p>;
-  if (error) return <p style={{ color: "red", textAlign: "center", fontSize: "1.2rem" }}>❌ {error}</p>;
 
   return (
-    <div style={{ padding: "20px", maxWidth: "1200px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: "20px", maxWidth: "1400px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <h2 style={{ fontSize: "1.8rem", marginBottom: "10px", color: "#333" }}>📋 Registrations</h2>
 
-      {/* Updated Legend with Registration Types */}
+      {/* Error Display */}
+      {error && (
+        <div style={{
+          padding: "12px 15px",
+          backgroundColor: "#f8d7da",
+          color: "#721c24",
+          borderRadius: "4px",
+          marginBottom: "15px",
+          border: "1px solid #f5c6cb"
+        }}>
+          ❌ {error}
+        </div>
+      )}
+
+      {/* ✅ Search and Sort Controls */}
       <div style={{
-        padding: "10px 15px", backgroundColor: "#f8f9fa", borderRadius: "8px", marginBottom: "20px",
-        display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "center", border: "1px solid #ddd"
+        padding: "15px",
+        backgroundColor: "#ffffff",
+        borderRadius: "8px",
+        marginBottom: "20px",
+        border: "1px solid #ddd",
+        display: "flex",
+        gap: "15px",
+        flexWrap: "wrap",
+        alignItems: "center"
+      }}>
+        {/* Search Input */}
+        <div style={{ flex: "1 1 300px", minWidth: "250px" }}>
+          <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
+            🔍 Search
+          </label>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input
+              type="text"
+              placeholder="Search by name, email, company, ticket..."
+              value={search}
+              onChange={handleSearchChange}
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                border: "1px solid #ced4da",
+                borderRadius: "4px",
+                fontSize: "0.95rem",
+                outline: "none",
+                transition: "border-color 0.3s"
+              }}
+              onFocus={(e) => e.target.style.borderColor = "#007bff"}
+              onBlur={(e) => e.target.style.borderColor = "#ced4da"}
+            />
+            {search && (
+              <button
+                onClick={handleClearSearch}
+                style={{
+                  padding: "10px 16px",
+                  backgroundColor: "#6c757d",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  transition: "background-color 0.3s"
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = "#5a6268"}
+                onMouseOut={(e) => e.target.style.backgroundColor = "#6c757d"}
+              >
+                ✕ Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sort by ID */}
+        <div style={{ flex: "0 0 auto" }}>
+          <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
+            📊 Sort by ID
+          </label>
+          <button
+            onClick={handleToggleSort}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "#17a2b8",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "0.95rem",
+              fontWeight: "600",
+              transition: "background-color 0.3s"
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = "#138496"}
+            onMouseOut={(e) => e.target.style.backgroundColor = "#17a2b8"}
+          >
+            {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
+          </button>
+        </div>
+
+        {/* Refresh Button */}
+        <div style={{ flex: "0 0 auto" }}>
+          <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem", opacity: 0 }}>
+            _
+          </label>
+          <button
+            onClick={fetchAllRegistrations}
+            disabled={loading}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "#28a745",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: "0.95rem",
+              fontWeight: "600",
+              opacity: loading ? 0.6 : 1,
+              transition: "background-color 0.3s"
+            }}
+            onMouseOver={(e) => !loading && (e.target.style.backgroundColor = "#218838")}
+            onMouseOut={(e) => !loading && (e.target.style.backgroundColor = "#28a745")}
+          >
+            🔄 Refresh
+          </button>
+        </div>
+
+        {/* Active Filter Indicator */}
+        {search && (
+          <div style={{ 
+            flex: "1 1 100%", 
+            padding: "10px", 
+            backgroundColor: "#d1ecf1", 
+            borderRadius: "4px",
+            fontSize: "0.9rem",
+            color: "#0c5460"
+          }}>
+            <strong>🔍 Active Filter:</strong> Searching for "{search}" - 
+            Found <strong>{filteredRegistrations.length}</strong> of <strong>{allRegistrations.length}</strong> total registrations
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div style={{
+        padding: "10px 15px", 
+        backgroundColor: "#f8f9fa", 
+        borderRadius: "8px", 
+        marginBottom: "20px",
+        display: "flex", 
+        flexWrap: "wrap", 
+        gap: "20px", 
+        alignItems: "center", 
+        border: "1px solid #ddd"
       }}>
         <h4 style={{ margin: 0, marginRight: "10px", fontSize: "1rem" }}>Legend:</h4>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "15px" }}>
@@ -241,53 +609,14 @@ export default function Registrations() {
         </div>
       </div>
 
-      {/* Pagination controls */}
-      {pagination && pagination.meta && (
-        <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>
-            Showing {pagination.meta.from || 0} to {pagination.meta.to || 0} of {pagination.meta.total || 0} registrations
-          </span>
-          <div style={{ display: "flex", gap: "10px" }}>
-            {pagination.links?.prev && (
-              <button
-                onClick={() => fetchRegistrations(pagination.links.prev)}
-                style={{
-                  padding: "8px 12px",
-                  backgroundColor: "#007bff",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-              >
-                Previous
-              </button>
-            )}
-            {pagination.links?.next && (
-              <button
-                onClick={() => fetchRegistrations(pagination.links.next)}
-                style={{
-                  padding: "8px 12px",
-                  backgroundColor: "#007bff",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-              >
-                Next
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
+      {/* Table */}
       <div style={{ overflowX: "auto", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
-          {/* Updated Table Headers */}
           <thead>
             <tr style={{ backgroundColor: "#343a40", color: "white" }}>
-              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>ID</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>
+                ID {sortOrder === 'asc' ? '↑' : '↓'}
+              </th>
               <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Name</th>
               <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Company</th>
               <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Ticket</th>
@@ -298,8 +627,8 @@ export default function Registrations() {
             </tr>
           </thead>
           <tbody>
-            {registrations.length > 0 ? (
-              registrations.map((reg, index) => (
+            {currentRecords.length > 0 ? (
+              currentRecords.map((reg, index) => (
                 <tr
                   key={reg.id}
                   style={{
@@ -316,7 +645,7 @@ export default function Registrations() {
                   <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.company_name || "N/A"}</td>
                   <td style={{ padding: "12px", borderBottom: "1px solid #ddd", fontSize: "0.85rem" }}>{reg.ticket_number}</td>
                   
-                  {/* ✅ Registration Type */}
+                  {/* Registration Type */}
                   <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
                     <span
                       style={{
@@ -332,7 +661,7 @@ export default function Registrations() {
                     </span>
                   </td>
 
-                  {/* ✅ UPDATED: Payment Status - Now clickable if user has edit permission */}
+                  {/* Payment Status */}
                   <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
                     <span
                       onClick={() => canEdit && handleTogglePayment(reg)}
@@ -457,13 +786,37 @@ export default function Registrations() {
             ) : (
               <tr>
                 <td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#6c757d" }}>
-                  No registrations found
+                  {search ? (
+                    <>
+                      🔍 No registrations found matching "{search}"
+                      <br />
+                      <button
+                        onClick={handleClearSearch}
+                        style={{
+                          marginTop: "10px",
+                          padding: "8px 16px",
+                          backgroundColor: "#007bff",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "4px",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Clear Search
+                      </button>
+                    </>
+                  ) : (
+                    "No registrations found"
+                  )}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {/* ✅ Pagination */}
+      {renderPagination()}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Edit Registration">
         {editingRegistration && (

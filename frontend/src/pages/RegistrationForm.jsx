@@ -237,9 +237,10 @@ export default function RegistrationForm() {
         {/* Company Name Field */}
         <input
           name="company_name"
-          placeholder="Company Name (optional)"
+          placeholder="Company/Organization Name"
           value={form.company_name}
           onChange={handleChange}
+          required
           style={{
             padding: "12px",
             border: isPreRegistered ? "1px solid #4CAF50" : "1px solid #ddd",

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Container, Row, Col, Card, Button, Badge, ListGroup, ProgressBar, Alert, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from "../context/AuthContext"; // ✅ ADD THIS IMPORT
 import api from "../api/axios";
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth(); // ✅ Get user from auth context
   const [user, setUser] = useState(null);
   const [summary, setSummary] = useState(null);
   const [reportsCounts, setReportsCounts] = useState(null);
@@ -46,6 +48,12 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ Helper function to check permissions
+  const hasPermission = (permission) => {
+    if (!permission) return true;
+    return authUser?.role?.permissions?.includes(permission) || user?.role?.permissions?.includes(permission);
   };
 
   if (loading) {
@@ -121,13 +129,15 @@ export default function Home() {
                   Last updated by {serverMode.activated_by?.name || 'System'}
                 </small>
               </div>
-              <Button 
-                variant="outline-dark" 
-                size="sm"
-                onClick={() => navigate('/server-mode')}
-              >
-                Manage Mode
-              </Button>
+              {hasPermission('edit-server-mode') && (
+                <Button 
+                  variant="outline-dark" 
+                  size="sm"
+                  onClick={() => navigate('/dashboard/server-mode')}
+                >
+                  Manage Mode
+                </Button>
+              )}
             </Alert>
           </Col>
         </Row>
@@ -148,14 +158,16 @@ export default function Home() {
                 </div>
               </div>
               <div className="mt-3">
-                <Button 
-                  variant="outline-primary" 
-                  size="sm" 
-                  className="w-100"
-                  onClick={() => navigate('/reports')}
-                >
-                  View Reports
-                </Button>
+                {hasPermission('view-reports') && (
+                  <Button 
+                    variant="outline-primary" 
+                    size="sm" 
+                    className="w-100"
+                    onClick={() => navigate('/dashboard/reports')}
+                  >
+                    View Reports
+                  </Button>
+                )}
               </div>
             </Card.Body>
           </Card>
@@ -234,94 +246,144 @@ export default function Home() {
       <Row className="g-4">
         {/* Left Column */}
         <Col xs={12} lg={8}>
-          {/* Quick Actions */}
+          {/* ✅ UPDATED QUICK ACTIONS WITH CORRECT ROUTES */}
           <Card className="shadow-sm border-0 mb-4">
             <Card.Header className="bg-white border-bottom">
               <h5 className="mb-0 fw-semibold text-primary">⚡ Quick Actions</h5>
             </Card.Header>
             <Card.Body className="p-4">
               <Row className="g-3">
-                <Col xs={12} sm={6} md={4}>
-                  <Card 
-                    className="h-100 border-primary text-center cursor-pointer hover-shadow"
-                    onClick={() => navigate('/scanner')}
-                    style={{ cursor: 'pointer', transition: 'all 0.3s' }}
-                  >
-                    <Card.Body className="p-4">
-                      <div style={{ fontSize: '3rem' }}>📷</div>
-                      <h6 className="mt-2 mb-0">Scan QR Code</h6>
-                      <small className="text-muted">Check-in attendees</small>
-                    </Card.Body>
-                  </Card>
-                </Col>
+                {/* QR Scanner */}
+                {hasPermission('scan-registration') && (
+                  <Col xs={12} sm={6} md={4}>
+                    <Card 
+                      className="h-100 border-primary text-center cursor-pointer hover-shadow"
+                      onClick={() => navigate('/dashboard/scanner')}
+                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                    >
+                      <Card.Body className="p-4">
+                        <div style={{ fontSize: '3rem' }}>📷</div>
+                        <h6 className="mt-2 mb-0">Scan QR Code</h6>
+                        <small className="text-muted">Check-in attendees</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
 
-                <Col xs={12} sm={6} md={4}>
-                  <Card 
-                    className="h-100 border-success text-center cursor-pointer hover-shadow"
-                    onClick={() => navigate('/reports')}
-                    style={{ cursor: 'pointer', transition: 'all 0.3s' }}
-                  >
-                    <Card.Body className="p-4">
-                      <div style={{ fontSize: '3rem' }}>📊</div>
-                      <h6 className="mt-2 mb-0">View Reports</h6>
-                      <small className="text-muted">Export & analyze data</small>
-                    </Card.Body>
-                  </Card>
-                </Col>
+                {/* Reports */}
+                {hasPermission('view-reports') && (
+                  <Col xs={12} sm={6} md={4}>
+                    <Card 
+                      className="h-100 border-success text-center cursor-pointer hover-shadow"
+                      onClick={() => navigate('/dashboard/reports')}
+                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                    >
+                      <Card.Body className="p-4">
+                        <div style={{ fontSize: '3rem' }}>📊</div>
+                        <h6 className="mt-2 mb-0">View Reports</h6>
+                        <small className="text-muted">Export & analyze data</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
 
-                <Col xs={12} sm={6} md={4}>
-                  <Card 
-                    className="h-100 border-info text-center cursor-pointer hover-shadow"
-                    onClick={() => navigate('/settings')}
-                    style={{ cursor: 'pointer', transition: 'all 0.3s' }}
-                  >
-                    <Card.Body className="p-4">
-                      <div style={{ fontSize: '3rem' }}>⚙️</div>
-                      <h6 className="mt-2 mb-0">Settings</h6>
-                      <small className="text-muted">Configure badges</small>
-                    </Card.Body>
-                  </Card>
-                </Col>
+                {/* Badge Settings */}
+                {hasPermission('edit-settings') && (
+                  <Col xs={12} sm={6} md={4}>
+                    <Card 
+                      className="h-100 border-info text-center cursor-pointer hover-shadow"
+                      onClick={() => navigate('/dashboard/settings')}
+                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                    >
+                      <Card.Body className="p-4">
+                        <div style={{ fontSize: '3rem' }}>⚙️</div>
+                        <h6 className="mt-2 mb-0">Badge Settings</h6>
+                        <small className="text-muted">Configure badges</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
 
-                <Col xs={12} sm={6} md={4}>
-                  <Card 
-                    className="h-100 border-warning text-center cursor-pointer hover-shadow"
-                    onClick={() => navigate('/server-mode')}
-                    style={{ cursor: 'pointer', transition: 'all 0.3s' }}
-                  >
-                    <Card.Body className="p-4">
-                      <div style={{ fontSize: '3rem' }}>🖥️</div>
-                      <h6 className="mt-2 mb-0">Server Mode</h6>
-                      <small className="text-muted">Manage registration mode</small>
-                    </Card.Body>
-                  </Card>
-                </Col>
+                {/* Server Mode */}
+                {hasPermission('edit-server-mode') && (
+                  <Col xs={12} sm={6} md={4}>
+                    <Card 
+                      className="h-100 border-warning text-center cursor-pointer hover-shadow"
+                      onClick={() => navigate('/dashboard/server-mode')}
+                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                    >
+                      <Card.Body className="p-4">
+                        <div style={{ fontSize: '3rem' }}>🖥️</div>
+                        <h6 className="mt-2 mb-0">Server Mode</h6>
+                        <small className="text-muted">Manage registration mode</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
 
-                <Col xs={12} sm={6} md={4}>
-                  <Card 
-                    className="h-100 border-danger text-center cursor-pointer hover-shadow"
-                    onClick={() => navigate('/dashboard')}
-                    style={{ cursor: 'pointer', transition: 'all 0.3s' }}
-                  >
-                    <Card.Body className="p-4">
-                      <div style={{ fontSize: '3rem' }}>📈</div>
-                      <h6 className="mt-2 mb-0">Analytics</h6>
-                      <small className="text-muted">Detailed statistics</small>
-                    </Card.Body>
-                  </Card>
-                </Col>
+                {/* Registrations */}
+                {hasPermission('view-registrations') && (
+                  <Col xs={12} sm={6} md={4}>
+                    <Card 
+                      className="h-100 border-danger text-center cursor-pointer hover-shadow"
+                      onClick={() => navigate('/dashboard/registrations')}
+                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                    >
+                      <Card.Body className="p-4">
+                        <div style={{ fontSize: '3rem' }}>📈</div>
+                        <h6 className="mt-2 mb-0">Registrations</h6>
+                        <small className="text-muted">Print & Edit Information</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
 
-                {user?.role?.name === 'superadmin' && (
+                {/* New Registration */}
+                {hasPermission('create-registration') && (
+                  <Col xs={12} sm={6} md={4}>
+                    <Card 
+                      className="h-100 border-success text-center cursor-pointer hover-shadow"
+                      onClick={() => navigate('/dashboard/register-new')}
+                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                    >
+                      <Card.Body className="p-4">
+                        <div style={{ fontSize: '3rem' }}>➕</div>
+                        <h6 className="mt-2 mb-0">New Registration</h6>
+                        <small className="text-muted">Add new attendee</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
+
+                {/* User Management */}
+                {(user?.role?.name === 'superadmin' || hasPermission('view-users')) && (
                   <Col xs={12} sm={6} md={4}>
                     <Card 
                       className="h-100 border-dark text-center cursor-pointer hover-shadow"
-                      onClick={() => navigate('/users')}
+                      onClick={() => navigate('/dashboard/user-management')}
                       style={{ cursor: 'pointer', transition: 'all 0.3s' }}
                     >
                       <Card.Body className="p-4">
                         <div style={{ fontSize: '3rem' }}>👨‍💼</div>
                         <h6 className="mt-2 mb-0">User Management</h6>
                         <small className="text-muted">Manage users & roles</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
+
+                {/* Role Management */}
+                {(user?.role?.name === 'superadmin' || hasPermission('manage-roles')) && (
+                  <Col xs={12} sm={6} md={4}>
+                    <Card 
+                      className="h-100 border-secondary text-center cursor-pointer hover-shadow"
+                      onClick={() => navigate('/dashboard/role-management')}
+                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                    >
+                      <Card.Body className="p-4">
+                        <div style={{ fontSize: '3rem' }}>🔐</div>
+                        <h6 className="mt-2 mb-0">Role Management</h6>
+                        <small className="text-muted">Manage permissions</small>
                       </Card.Body>
                     </Card>
                   </Col>
@@ -370,15 +432,15 @@ export default function Home() {
             <Card.Body className="p-0">
               {recentScans && recentScans.length > 0 ? (
                 <ListGroup variant="flush">
-                  {recentScans.map((user, index) => (
+                  {recentScans.map((scanUser, index) => (
                     <ListGroup.Item key={index} className="d-flex justify-content-between align-items-center">
                       <div>
-                        <strong>{user.name}</strong>
+                        <strong>{scanUser.name}</strong>
                         <br />
-                        <small className="text-muted">{user.email}</small>
+                        <small className="text-muted">{scanUser.email}</small>
                       </div>
                       <Badge bg="primary" pill>
-                        {user.scans_count || 0} scans
+                        {scanUser.scans_count || 0} scans
                       </Badge>
                     </ListGroup.Item>
                   ))}

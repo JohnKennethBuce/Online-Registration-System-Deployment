@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Table, Form, Button, Container, Row, Col, ListGroup, InputGroup, Spinner, Badge, Card } from 'react-bootstrap';
+import { Table, Form, Button, Container, Row, Col, InputGroup, Spinner, Badge, Card, Pagination } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -11,23 +11,23 @@ const Reports = () => {
   const [filteredRegistrations, setFilteredRegistrations] = useState([]);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [recordsPerPage] = useState(50);
+  const [recordsPerPage] = useState(10); // ✅ CHANGED FROM 50 TO 10
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
 
-  // ✅ NEW: Date filtering
+  // Date filtering
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // ✅ NEW: Payment filtering
-  const [paymentFilter, setPaymentFilter] = useState('both'); // 'paid', 'unpaid', 'both'
+  // Payment filtering
+  const [paymentFilter, setPaymentFilter] = useState('both');
 
-  // ✅ NEW: Sorting (default ascending by ID)
+  // Sorting
   const [sortField, setSortField] = useState('id');
   const [sortOrder, setSortOrder] = useState('asc');
 
-  // ✅ NEW: Column visibility
+  // Column visibility
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
     name: true,
@@ -42,13 +42,11 @@ const Reports = () => {
     date: true
   });
 
-  // ✅ Load all data once on mount
   useEffect(() => {
     fetchCounts();
     fetchAllData();
   }, []);
 
-  // ✅ Filter and sort data whenever any filter changes
   useEffect(() => {
     filterAndSortData();
     setCurrentPage(1);
@@ -70,7 +68,7 @@ const Reports = () => {
     try {
       setLoading(true);
       setError(null);
-
+      
       const res = await api.get('/dashboard/reports-list', { 
         params: { all: true } 
       });
@@ -90,7 +88,6 @@ const Reports = () => {
     }
   };
 
-  // ✅ Enhanced filtering with date, payment, search, and sorting
   const filterAndSortData = () => {
     let filtered = [...allRegistrations];
 
@@ -183,7 +180,6 @@ const Reports = () => {
     setFilteredRegistrations(filtered);
   };
 
-  // ✅ Calculate counts from filtered data
   const calculateCounts = (data) => {
     const counts = {
       not_printed: 0,
@@ -218,7 +214,7 @@ const Reports = () => {
 
   const formatRegistrationType = (type) => {
     if (!type) return 'N/A';
-    return type.split('-').map(word => 
+    return type.split('-').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join('-');
   };
@@ -230,7 +226,6 @@ const Reports = () => {
     fetchCounts();
   };
 
-  // ✅ NEW: Handle column visibility toggle
   const handleColumnToggle = (column) => {
     setVisibleColumns(prev => ({
       ...prev,
@@ -238,7 +233,6 @@ const Reports = () => {
     }));
   };
 
-  // ✅ NEW: Handle sorting
   const handleSort = (field) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -248,7 +242,6 @@ const Reports = () => {
     }
   };
 
-  // ✅ NEW: Clear all filters
   const handleClearFilters = () => {
     setSearch('');
     setDateFrom('');
@@ -258,16 +251,80 @@ const Reports = () => {
     setSortOrder('asc');
   };
 
-  // ✅ Pagination
+  // ✅ PAGINATION CALCULATIONS
   const indexOfLastRecord = currentPage * recordsPerPage;
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
   const currentRecords = filteredRegistrations.slice(indexOfFirstRecord, indexOfLastRecord);
   const totalPages = Math.ceil(filteredRegistrations.length / recordsPerPage);
 
-  // ✅ Check if any filter is active
   const hasActiveFilters = search || dateFrom || dateTo || paymentFilter !== 'both' || sortField !== 'id' || sortOrder !== 'asc';
 
-  // ✅ PDF Export
+  // ✅ IMPROVED PAGINATION COMPONENT
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const items = [];
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    return (
+      <Pagination className="mb-0">
+        <Pagination.First 
+          onClick={() => setCurrentPage(1)} 
+          disabled={currentPage === 1}
+        />
+        <Pagination.Prev 
+          onClick={() => setCurrentPage(currentPage - 1)} 
+          disabled={currentPage === 1}
+        />
+
+        {startPage > 1 && (
+          <>
+            <Pagination.Item onClick={() => setCurrentPage(1)}>1</Pagination.Item>
+            {startPage > 2 && <Pagination.Ellipsis disabled />}
+          </>
+        )}
+
+        {[...Array(endPage - startPage + 1)].map((_, idx) => {
+          const pageNum = startPage + idx;
+          return (
+            <Pagination.Item
+              key={pageNum}
+              active={pageNum === currentPage}
+              onClick={() => setCurrentPage(pageNum)}
+            >
+              {pageNum}
+            </Pagination.Item>
+          );
+        })}
+
+        {endPage < totalPages && (
+          <>
+            {endPage < totalPages - 1 && <Pagination.Ellipsis disabled />}
+            <Pagination.Item onClick={() => setCurrentPage(totalPages)}>
+              {totalPages}
+            </Pagination.Item>
+          </>
+        )}
+
+        <Pagination.Next 
+          onClick={() => setCurrentPage(currentPage + 1)} 
+          disabled={currentPage === totalPages}
+        />
+        <Pagination.Last 
+          onClick={() => setCurrentPage(totalPages)} 
+          disabled={currentPage === totalPages}
+        />
+      </Pagination>
+    );
+  };
+
+  // PDF Export (unchanged - exports all filtered records)
   const exportToPDF = async () => {
     try {
       setExporting(true);
@@ -299,7 +356,6 @@ const Reports = () => {
 
       let yPos = 27;
 
-      // Filter info
       if (hasActiveFilters) {
         doc.setFontSize(9);
         doc.setTextColor(255, 0, 0);
@@ -310,7 +366,6 @@ const Reports = () => {
         yPos += 3;
       }
 
-      // Summary
       doc.setFontSize(11);
       doc.setTextColor(0, 0, 0);
       doc.text('Summary:', 14, yPos);
@@ -333,7 +388,6 @@ const Reports = () => {
       doc.setDrawColor(200, 200, 200);
       doc.line(14, yPos, 283, yPos);
 
-      // Prepare table data based on visible columns
       const headers = [];
       const columnIndices = [];
 
@@ -409,7 +463,7 @@ const Reports = () => {
     }
   };
 
-  // ✅ CSV Export
+  // CSV Export (unchanged - exports all filtered records)
   const exportToCSV = async () => {
     try {
       setExporting(true);
@@ -469,7 +523,6 @@ const Reports = () => {
         if (visibleColumns.payment) row.push(reg.payment_status);
         if (visibleColumns.badge) row.push(`"${reg.badge_status?.name || 'N/A'}"`);
         if (visibleColumns.ticket) row.push(`#${reg.id}`);
-
         if (visibleColumns.date) row.push(new Date(reg.created_at).toLocaleString());
         return row;
       });
@@ -541,7 +594,7 @@ const Reports = () => {
         </div>
       )}
 
-      {/* ✅ SUMMARY SECTION - TOP */}
+      {/* SUMMARY SECTION */}
       <Card className="mb-4 shadow-sm">
         <Card.Header className="bg-primary text-white">
           <h5 className="mb-0">📊 Summary Statistics</h5>
@@ -587,15 +640,14 @@ const Reports = () => {
           </Row>
         </Card.Body>
       </Card>
-      
 
-      {/* ✅ REPORTS SECTION */}
+      {/* REPORTS SECTION */}
       <Card className="mb-3 shadow-sm">
         <Card.Header className="bg-success text-white">
           <h5 className="mb-0">📋 Registration List</h5>
         </Card.Header>
         <Card.Body>
-          {/* ✅ FILTERS ROW */}
+          {/* FILTERS ROW */}
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
@@ -677,7 +729,7 @@ const Reports = () => {
             </Col>
           </Row>
 
-          {/* ✅ COLUMN VISIBILITY CHECKBOXES */}
+          {/* COLUMN VISIBILITY */}
           <Row className="mb-3">
             <Col>
               <div className="border rounded p-2 bg-light">
@@ -712,7 +764,7 @@ const Reports = () => {
             </Col>
           </Row>
 
-          {/* ✅ ACTIVE FILTERS DISPLAY */}
+          {/* ACTIVE FILTERS DISPLAY */}
           {hasActiveFilters && (
             <div className="alert alert-info py-2 px-3 mb-3">
               <small>
@@ -727,7 +779,7 @@ const Reports = () => {
             </div>
           )}
 
-          {/* ✅ TABLE */}
+          {/* TABLE */}
           {loading ? (
             <div className="text-center p-5">
               <Spinner animation="border" variant="primary" />
@@ -847,31 +899,22 @@ const Reports = () => {
                 </Table>
               </div>
 
-              {/* ✅ PAGINATION */}
+              {/* ✅ IMPROVED PAGINATION */}
               {totalPages > 1 && (
-                <div className="d-flex justify-content-between align-items-center mt-3">
-                  <Button 
-                    variant="outline-secondary" 
-                    size="sm"
-                    disabled={currentPage === 1} 
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    ← Previous
-                  </Button>
-                  <span className="text-muted">
+                <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-3">
+                  <div className="text-muted small">
+                    Showing <strong>{indexOfFirstRecord + 1}</strong> to{' '}
+                    <strong>{Math.min(indexOfLastRecord, filteredRegistrations.length)}</strong> of{' '}
+                    <strong>{filteredRegistrations.length}</strong> records
+                  </div>
+                  
+                  <div className="d-flex justify-content-center flex-grow-1">
+                    {renderPagination()}
+                  </div>
+
+                  <div className="text-muted small">
                     Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
-                    <small className="ms-2">
-                      (Showing {indexOfFirstRecord + 1}-{Math.min(indexOfLastRecord, filteredRegistrations.length)} of {filteredRegistrations.length})
-                    </small>
-                  </span>
-                  <Button 
-                    variant="outline-secondary" 
-                    size="sm"
-                    disabled={currentPage === totalPages} 
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    Next →
-                  </Button>
+                  </div>
                 </div>
               )}
             </>
@@ -879,7 +922,7 @@ const Reports = () => {
         </Card.Body>
       </Card>
 
-      {/* ✅ EXPORT SECTION - BOTTOM */}
+      {/* EXPORT SECTION */}
       <Card className="shadow-sm">
         <Card.Header className="bg-dark text-white">
           <h5 className="mb-0">📥 Export Options</h5>
@@ -913,17 +956,17 @@ const Reports = () => {
                 )}
               </Button>
             </Col>
-              <Col md={6}>
+            <Col md={6}>
               <Button 
                 variant="success"
                 onClick={exportToCSV}
-                disabled={true}  // Always disabled
+                disabled={true}
                 size="lg"
                 className="w-100"
                 style={{
-                  pointerEvents: 'none',  // Prevent all click events
-                  cursor: 'not-allowed',  // Show not-allowed cursor
-                  opacity: 0.6  // Optional: make it look visually disabled
+                  pointerEvents: 'none',
+                  cursor: 'not-allowed',
+                  opacity: 0.6
                 }}
               >
                 {exporting ? (

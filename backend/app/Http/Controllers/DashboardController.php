@@ -26,52 +26,56 @@ class DashboardController extends Controller
     /**
      * Dashboard summary (all key stats in one payload).
      */
-    public function summary(): JsonResponse
+   public function summary(): JsonResponse
     {
         try {
             $user = Auth::user();
-            $isSuperAdmin = $user->role->name === 'superadmin';
-            
+            /** @var \App\Models\User $user */
+
+            // ✅ FIX: Check permission OR superadmin role
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-dashboard');
+
             $cacheKey = "dashboard_summary:role_{$user->role->name}:user_{$user->id}";
-            
-            $summaryData = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($user, $isSuperAdmin) {
+
+            $summaryData = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($user, $canViewAll) {
                 $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
-                
-                $registrationQuery = $isSuperAdmin 
+
+                // ✅ Use permission-based filtering
+                $registrationQuery = $canViewAll
                     ? Registration::query() 
                     : Registration::where('registered_by', $user->id);
-                
+
                 return [
                     'server_mode' => $currentMode,
-                    
+
                     'registrations_by_type' => (clone $registrationQuery)
                         ->select('registration_type', DB::raw('count(*) as total'))
                         ->groupBy('registration_type')
                         ->get(),
-                    
+
                     'confirmed_vs_pending' => (clone $registrationQuery)
                         ->select('confirmed', DB::raw('count(*) as total'))
                         ->groupBy('confirmed')
                         ->get(),
-                    
+
                     'badge_statuses' => (clone $registrationQuery)
                         ->select('badge_printed_status_id', DB::raw('count(*) as total'))
                         ->groupBy('badge_printed_status_id')
                         ->get(),
-                    
+
                     'ticket_statuses' => (clone $registrationQuery)
                         ->select('ticket_printed_status_id', DB::raw('count(*) as total'))
                         ->groupBy('ticket_printed_status_id')
                         ->get(),
-                    
+
                     'scans_per_user' => User::withCount('scans')
-                        ->when(!$isSuperAdmin, fn($q) => $q->where('id', $user->id))
+                        ->when(!$canViewAll, fn($q) => $q->where('id', $user->id))
                         ->get(['id', 'name', 'email']),
                 ];
             });
-            
+
             return response()->json($summaryData);
-            
+
         } catch (\Exception $e) {
             Log::error('Dashboard summary error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
@@ -90,9 +94,11 @@ class DashboardController extends Controller
     {
         try {
             $user = Auth::user();
-            $isSuperAdmin = $user->role->name === 'superadmin';
+            /** @var \App\Models\User $user */
             
-            $query = $isSuperAdmin 
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-dashboard');
+            
+            $query = $canViewAll
                 ? Registration::query() 
                 : Registration::where('registered_by', $user->id);
             
@@ -109,7 +115,6 @@ class DashboardController extends Controller
             ], 500);
         }
     }
-
     /**
      * Detailed stats breakdown by ServerMode.
      */
@@ -117,26 +122,28 @@ class DashboardController extends Controller
     {
         try {
             $user = Auth::user();
-            $isSuperAdmin = $user->role->name === 'superadmin';
+            /** @var \App\Models\User $user */
+
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-dashboard');
             $currentMode = ServerMode::latest()->first()->mode ?? 'onsite';
 
-            $registrationQuery = $isSuperAdmin 
+            $registrationQuery = $canViewAll
                 ? Registration::query() 
                 : Registration::where('registered_by', $user->id);
 
             return response()->json([
                 'server_mode' => $currentMode,
                 'total_registrations' => (clone $registrationQuery)->count(),
-                
+
                 'by_mode' => (clone $registrationQuery)
                     ->select('server_mode', DB::raw('count(*) as total'))
                     ->groupBy('server_mode')
                     ->get(),
-                
+
                 'active_users' => User::where('status', 'active')->count(),
-                
+
                 'recent_scans' => Scan::query()
-                    ->when(!$isSuperAdmin, fn($q) => $q->where('scanned_by', $user->id))
+                    ->when(!$canViewAll, fn($q) => $q->where('scanned_by', $user->id))
                     ->where('scanned_time', '>', now()->subHours(24))
                     ->count(),
             ]);
@@ -156,18 +163,20 @@ class DashboardController extends Controller
     {
         try {
             $user = Auth::user();
-            $isSuperAdmin = $user->role->name === 'superadmin';
-            
-            $query = $isSuperAdmin 
+            /** @var \App\Models\User $user */
+
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-dashboard');
+
+            $query = $canViewAll
                 ? Registration::query() 
                 : Registration::where('registered_by', $user->id);
-            
+
             return response()->json([
                 'badge_statuses' => (clone $query)
                     ->select('badge_printed_status_id', DB::raw('count(*) as total'))
                     ->groupBy('badge_printed_status_id')
                     ->get(),
-                
+
                 'ticket_statuses' => (clone $query)
                     ->select('ticket_printed_status_id', DB::raw('count(*) as total'))
                     ->groupBy('ticket_printed_status_id')
@@ -189,10 +198,12 @@ class DashboardController extends Controller
     {
         try {
             $user = Auth::user();
-            $isSuperAdmin = $user->role->name === 'superadmin';
+            /** @var \App\Models\User $user */
+            
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-dashboard');
             
             $users = User::withCount('scans')
-                ->when(!$isSuperAdmin, fn($q) => $q->where('id', $user->id))
+                ->when(!$canViewAll, fn($q) => $q->where('id', $user->id))
                 ->get(['id', 'name', 'email']);
             
             return response()->json($users);
