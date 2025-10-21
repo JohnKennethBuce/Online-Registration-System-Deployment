@@ -18,8 +18,38 @@ return new class extends Migration {
             $table->text('phone')->nullable();
             $table->text('address')->nullable();
             $table->text('company_name');
+            $table->enum('age_range', [
+                    '18-24',
+                    '25-34',
+                    '35-44',
+                    '45-54',
+                    '55-64',
+                    '65+'
+                ])->nullable();
 
-            $table->enum('registration_type', ['onsite','online','pre-registered'])->index();
+            $table->enum('gender', [
+                    'Male',
+                    'Female',
+                    'Prefer not to say',
+                    'Others'
+                ])->nullable();
+            $table->text('gender_other')->nullable(); // Encrypted, 
+
+            $table->text('designation')->nullable(); // Encrypted,
+
+            $table->text('industry_sector')->nullable(); // Encrypted
+            $table->text('industry_sector_other')->nullable(); // Encrypted, for "Others" option
+
+            $table->text('reason_for_attending')->nullable(); // Encrypted
+            $table->text('reason_for_attending_other')->nullable(); // Encrypted, for "Others" option
+
+            $table->text('specific_areas_of_interest')->nullable(); // Encrypted
+            $table->text('specific_areas_of_interest_other')->nullable(); // Encrypted, for "Others" option
+
+            $table->text('how_did_you_learn_about')->nullable(); // Encrypted
+            $table->text('how_did_you_learn_about_other')->nullable();
+
+            $table->enum('registration_type', ['onsite','online','pre-registered', 'complimentary'])->index();
 
             // Ticket / QR
             $table->string('ticket_number', 100)->unique()->nullable();
@@ -44,7 +74,7 @@ return new class extends Migration {
                   ->constrained('users')->nullOnDelete();
 
             // Paid or Unpaid 
-            $table->enum('payment_status', ['paid', 'unpaid'])->default('unpaid')->index();
+            $table->enum('payment_status', ['paid', 'unpaid', "complimentary"])->default('unpaid')->index();
 
             $table->timestamps();
         });

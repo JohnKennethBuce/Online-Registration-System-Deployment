@@ -1,13 +1,329 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
-import Modal from "../components/Modal";
 import EditRegistrationForm from "../components/EditRegistrationForm";
 import { useAuth } from "../context/AuthContext";
+
+// Inline Modal Component with improved styling
+const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  const sizeStyles = {
+    small: { width: '90%', maxWidth: '400px' },
+    medium: { width: '90%', maxWidth: '600px' },
+    large: { width: '90%', maxWidth: '900px' }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      animation: 'fadeIn 0.2s ease-out'
+    }} onClick={handleBackdropClick}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideIn {
+          from { transform: translateY(-50px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+      <div style={{
+        ...sizeStyles[size],
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+        maxHeight: '90vh',
+        display: 'flex',
+        flexDirection: 'column',
+        animation: 'slideIn 0.3s ease-out',
+        margin: '20px'
+      }}>
+        <div style={{
+          padding: '20px',
+          borderBottom: '1px solid #e9ecef',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: '#333' }}>
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '2rem',
+              lineHeight: 1,
+              color: '#999',
+              cursor: 'pointer',
+              padding: 0,
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#f5f5f5';
+              e.currentTarget.style.color = '#333';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#999';
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Inline Payment Status Modal Component
+const PaymentStatusModal = ({ isOpen, onClose, registration, onConfirm, isUpdating }) => {
+  const [selectedStatus, setSelectedStatus] = useState('');
+  
+  if (!registration) return null;
+
+  const currentStatus = registration.payment_status || 'unpaid';
+
+  const handleConfirm = () => {
+    if (!selectedStatus) {
+      alert('Please select a payment status');
+      return;
+    }
+    if (selectedStatus === currentStatus) {
+      alert('Please select a different status than the current one');
+      return;
+    }
+    onConfirm(selectedStatus);
+  };
+
+  const paymentOptions = [
+    { value: 'paid', label: 'Paid', color: '#28a745', icon: '✅' },
+    { value: 'unpaid', label: 'Unpaid', color: '#dc3545', icon: '❌' },
+    { value: 'complimentary', label: 'Complimentary', color: '#17a2b8', icon: '🎁' },
+  ];
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Update Payment Status" size="small">
+      <div style={{ padding: '10px 0' }}>
+        {/* Registration Info */}
+        <div style={{
+          backgroundColor: '#f8f9fa',
+          padding: '15px',
+          borderRadius: '8px',
+          marginBottom: '20px'
+        }}>
+          <h4 style={{ margin: '0 0 10px 0', color: '#495057' }}>Registration Details</h4>
+          <div style={{ fontSize: '0.9rem', color: '#6c757d' }}>
+            <div><strong>Name:</strong> {registration.first_name} {registration.last_name}</div>
+            <div><strong>Company:</strong> {registration.company_name || 'N/A'}</div>
+            <div><strong>Ticket:</strong> {registration.ticket_number}</div>
+            <div style={{ marginTop: '10px' }}>
+              <strong>Current Status:</strong>{' '}
+              <span style={{
+                padding: '4px 10px',
+                borderRadius: '12px',
+                backgroundColor: currentStatus === 'paid' ? '#28a745' : 
+                               currentStatus === 'unpaid' ? '#dc3545' : '#17a2b8',
+                color: 'white',
+                fontSize: '0.85rem',
+                fontWeight: 'bold'
+              }}>
+                {currentStatus.toUpperCase()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Status Options */}
+        <div>
+          <h4 style={{ margin: '0 0 15px 0', color: '#495057' }}>Select New Status</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {paymentOptions.map(option => (
+              <label
+                key={option.value}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: `2px solid ${selectedStatus === option.value ? option.color : '#dee2e6'}`,
+                  backgroundColor: selectedStatus === option.value ? `${option.color}15` : 'white',
+                  cursor: option.value === currentStatus ? 'not-allowed' : 'pointer',
+                  opacity: option.value === currentStatus ? 0.5 : 1,
+                  transition: 'all 0.2s'
+                }}
+              >
+                <input
+                  type="radio"
+                  name="paymentStatus"
+                  value={option.value}
+                  checked={selectedStatus === option.value}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  disabled={option.value === currentStatus}
+                  style={{ marginRight: '12px' }}
+                />
+                <span style={{ fontSize: '1.2rem', marginRight: '10px' }}>{option.icon}</span>
+                <span style={{ 
+                  fontWeight: selectedStatus === option.value ? 'bold' : 'normal',
+                  color: option.value === currentStatus ? '#6c757d' : '#212529'
+                }}>
+                  {option.label}
+                  {option.value === currentStatus && ' (Current)'}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          marginTop: '25px',
+          paddingTop: '20px',
+          borderTop: '1px solid #dee2e6'
+        }}>
+          <button
+            onClick={onClose}
+            disabled={isUpdating}
+            style={{
+              flex: 1,
+              padding: '10px',
+              border: '1px solid #dee2e6',
+              backgroundColor: 'white',
+              color: '#6c757d',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              if (!isUpdating) {
+                e.currentTarget.style.backgroundColor = '#f8f9fa';
+              }
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'white';
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={!selectedStatus || isUpdating}
+            style={{
+              flex: 1,
+              padding: '10px',
+              border: 'none',
+              backgroundColor: selectedStatus ? 
+                (selectedStatus === 'paid' ? '#28a745' : 
+                 selectedStatus === 'unpaid' ? '#dc3545' : '#17a2b8') : '#6c757d',
+              color: 'white',
+              borderRadius: '6px',
+              cursor: !selectedStatus || isUpdating ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: '600',
+              opacity: !selectedStatus || isUpdating ? 0.6 : 1,
+              transition: 'all 0.2s'
+            }}
+          >
+            {isUpdating ? 'Updating...' : 'Confirm Update'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// Inline Confirm Delete Modal
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", danger = false }) => {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size="small">
+      <div>
+        <p style={{ fontSize: '1rem', color: '#495057', marginBottom: '20px' }}>
+          {message}
+        </p>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 20px',
+              border: '1px solid #dee2e6',
+              backgroundColor: 'white',
+              color: '#6c757d',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: '500'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              backgroundColor: danger ? '#dc3545' : '#007bff',
+              color: 'white',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: '600'
+            }}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
 
 export default function Registrations() {
   const { user, loading: authLoading } = useAuth();
   
-  // ✅ NEW: Separate all data from filtered data
   const [allRegistrations, setAllRegistrations] = useState([]);
   const [filteredRegistrations, setFilteredRegistrations] = useState([]);
   
@@ -17,25 +333,78 @@ export default function Registrations() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRegistration, setEditingRegistration] = useState(null);
   const [togglingPaymentId, setTogglingPaymentId] = useState(null);
+  const [expandedRowId, setExpandedRowId] = useState(null);
   
-  // ✅ NEW: Search and sorting states
   const [search, setSearch] = useState('');
-  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [sortOrder, setSortOrder] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(15);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedRegistration, setSelectedRegistration] = useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [registrationToDelete, setRegistrationToDelete] = useState(null);
+
+  const [filters, setFilters] = useState({
+    registrationType: 'all',
+    paymentStatus: 'all',
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   const backendBase = api.defaults.baseURL;
 
-  // 🔐 --- Authorization Check ---
   const isAuthorized =
     user &&
     ["admin", "superadmin"].includes(user.role?.name) &&
     user.role?.permissions?.includes("view-registrations");
 
-  // ✅ Check if user can edit registrations (for payment toggle)
   const canEdit = user?.role?.permissions?.includes("edit-registration");
+  const canDelete = user?.role?.permissions?.includes("delete-registration");
 
-  // ✅ Format registration type for display
+  // Updated payment status handlers to use modal
+  const handlePaymentStatusChange = (registration) => {
+    if (!canEdit) {
+      alert("You don't have permission to change payment status.");
+      return;
+    }
+    setSelectedRegistration(registration);
+    setPaymentModalOpen(true);
+  };
+
+  const handlePaymentStatusUpdate = async (newStatus) => {
+    if (!selectedRegistration) return;
+    
+    setTogglingPaymentId(selectedRegistration.id);
+    setError(null);
+
+    try {
+      const response = await api.put(`/registrations/${selectedRegistration.id}/payment-status`, {
+        payment_status: newStatus
+      });
+      
+      const updatedData = response.data;
+      setAllRegistrations(prevRegs => 
+        prevRegs.map(reg => reg.id === selectedRegistration.id ? updatedData : reg)
+      );
+      setFilteredRegistrations(prevRegs => 
+        prevRegs.map(reg => reg.id === selectedRegistration.id ? updatedData : reg)
+      );
+
+      setPaymentModalOpen(false);
+      setSelectedRegistration(null);
+      
+      // Optional: You can replace this with a toast notification
+      alert(`✅ Payment status updated to ${newStatus.toUpperCase()}`);
+
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || "Failed to update payment status";
+      setError(errorMsg);
+      alert(`❌ ${errorMsg}`);
+    } finally {
+      setTogglingPaymentId(null);
+    }
+  };
+
+  // Format registration type for display
   const formatRegistrationType = (type) => {
     if (!type) return 'N/A';
     return type.split('-').map(word => 
@@ -43,29 +412,85 @@ export default function Registrations() {
     ).join('-');
   };
 
-  // ✅ Get color for registration type
+  // Get color for registration type (includes complimentary)
   const getTypeColor = (type) => {
     switch (type) {
       case 'onsite': return '#007bff';
       case 'online': return '#17a2b8';
       case 'pre-registered': return '#6c757d';
+      case 'complimentary': return '#28a745';
       default: return '#343a40';
     }
   };
 
-  // ✅ Fetch ALL registrations once
+  // Get color for payment status (includes complimentary)
+  const getPaymentColor = (status) => {
+    switch (status) {
+      case 'paid': return '#28a745';
+      case 'unpaid': return '#dc3545';
+      case 'complimentary': return '#17a2b8';
+      default: return '#6c757d';
+    }
+  };
+
+  // Get color for badge status
+  const getBadgeStatusColor = (statusName) => {
+    switch (statusName) {
+      case 'not_printed': return '#6c757d';
+      case 'queued': return '#ffc107';
+      case 'printing': return '#007bff';
+      case 'printed': return '#28a745';
+      case 'reprinted': return '#fd7e14';
+      case 'failed': return '#dc3545';
+      default: return '#6c757d';
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // ✅ FIXED: Fetch ALL registrations by paginating through all pages
   const fetchAllRegistrations = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await api.get("/registrations", { 
-        params: { all: true } // Request all data at once
-      });
+      let allData = [];
+      let currentPageNum = 1;
+      let lastPage = 1;
+
+      // Fetch all pages (max 100 per page as per backend validation)
+      do {
+        const res = await api.get("/registrations", { 
+          params: { per_page: 100, page: currentPageNum }
+        });
+        
+        const responseData = res.data;
+        
+        // Handle Laravel pagination structure
+        if (responseData.data) {
+          allData = [...allData, ...responseData.data];
+          lastPage = responseData.last_page || 1;
+          currentPageNum++;
+        } else {
+          // If no pagination structure, treat as single page
+          allData = Array.isArray(responseData) ? responseData : [];
+          break;
+        }
+      } while (currentPageNum <= lastPage);
+
+      console.log('✅ Loaded all registrations:', allData.length);
       
-      const data = res.data.data || res.data || [];
-      console.log('✅ Loaded all registrations:', data.length);
-      
-      setAllRegistrations(data);
-      setFilteredRegistrations(data);
+      setAllRegistrations(allData);
+      setFilteredRegistrations(allData);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load registrations");
       setAllRegistrations([]);
@@ -75,24 +500,23 @@ export default function Registrations() {
     }
   };
 
-  // ✅ Load data on mount
   useEffect(() => {
     if (isAuthorized) {
       fetchAllRegistrations();
     }
   }, [isAuthorized]);
 
-  // ✅ Filter and sort whenever search or sortOrder changes
+  // Filter and sort whenever dependencies change
   useEffect(() => {
     filterAndSortData();
-    setCurrentPage(1); // Reset to first page when filtering
-  }, [search, sortOrder, allRegistrations]);
+    setCurrentPage(1);
+  }, [search, sortOrder, filters, allRegistrations]);
 
-  // ✅ Client-side filter and sort function
+  // Client-side filter and sort
   const filterAndSortData = () => {
     let filtered = [...allRegistrations];
 
-    // 1. Apply search filter
+    // Search filter
     if (search.trim()) {
       const searchLower = search.toLowerCase().trim();
       filtered = filtered.filter(reg => {
@@ -102,57 +526,73 @@ export default function Registrations() {
         const email = (reg.email || '').toLowerCase();
         const company = (reg.company_name || '').toLowerCase();
         const ticket = (reg.ticket_number || '').toLowerCase();
-        const type = (reg.registration_type || '').toLowerCase();
-        const payment = (reg.payment_status || '').toLowerCase();
         
         return firstName.includes(searchLower)
           || lastName.includes(searchLower)
           || fullName.includes(searchLower)
           || email.includes(searchLower)
           || company.includes(searchLower)
-          || ticket.includes(searchLower)
-          || type.includes(searchLower)
-          || payment.includes(searchLower);
+          || ticket.includes(searchLower);
       });
     }
 
-    // 2. Apply sorting by ID
+    // Registration type filter
+    if (filters.registrationType !== 'all') {
+      filtered = filtered.filter(reg => reg.registration_type === filters.registrationType);
+    }
+
+    // Payment status filter
+    if (filters.paymentStatus !== 'all') {
+      filtered = filtered.filter(reg => reg.payment_status === filters.paymentStatus);
+    }
+
+    // Sort by ID
     filtered.sort((a, b) => {
       const aVal = a.id || 0;
       const bVal = b.id || 0;
       return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
     });
 
-    console.log(`🔍 Filtered: ${filtered.length} from ${allRegistrations.length} total`);
+    console.log(`🔍 Filtered: ${filtered.length} from ${allRegistrations.length}`);
     setFilteredRegistrations(filtered);
   };
 
-  // ✅ Handle search input
   const handleSearchChange = (e) => {
     setSearch(e.target.value);
   };
 
-  // ✅ Clear search
   const handleClearSearch = () => {
     setSearch('');
   };
 
-  // ✅ Toggle sort order
   const handleToggleSort = () => {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
-  // ✅ Pagination calculations
+  // Reset filters
+  const handleResetFilters = () => {
+    setFilters({
+      registrationType: 'all',
+      paymentStatus: 'all',
+    });
+    setSearch('');
+  };
+
+  // Toggle expanded row
+  const toggleExpandRow = (id) => {
+    setExpandedRowId(prev => prev === id ? null : id);
+  };
+
+  // Pagination
   const indexOfLastRecord = currentPage * recordsPerPage;
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
   const currentRecords = filteredRegistrations.slice(indexOfFirstRecord, indexOfLastRecord);
   const totalPages = Math.ceil(filteredRegistrations.length / recordsPerPage);
 
-  // ✅ Render pagination
+  // Render pagination
   const renderPagination = () => {
     if (totalPages <= 1) return null;
 
-    const items = [];
     const maxPagesToShow = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
@@ -203,9 +643,7 @@ export default function Registrations() {
 
           {startPage > 1 && (
             <>
-              <button onClick={() => setCurrentPage(1)} style={paginationButtonStyle}>
-                1
-              </button>
+              <button onClick={() => setCurrentPage(1)} style={paginationButtonStyle}>1</button>
               {startPage > 2 && <span style={{ padding: "0 8px", color: "#6c757d" }}>...</span>}
             </>
           )}
@@ -229,9 +667,7 @@ export default function Registrations() {
           {endPage < totalPages && (
             <>
               {endPage < totalPages - 1 && <span style={{ padding: "0 8px", color: "#6c757d" }}>...</span>}
-              <button onClick={() => setCurrentPage(totalPages)} style={paginationButtonStyle}>
-                {totalPages}
-              </button>
+              <button onClick={() => setCurrentPage(totalPages)} style={paginationButtonStyle}>{totalPages}</button>
             </>
           )}
 
@@ -267,47 +703,6 @@ export default function Registrations() {
     );
   };
 
-  // ✅ Handle payment status toggle
-  const handleTogglePayment = async (registration) => {
-    if (!canEdit) {
-      alert("You don't have permission to change payment status.");
-      return;
-    }
-
-    const confirmMsg = registration.payment_status === 'paid' 
-      ? `Mark this registration as UNPAID?\n\nName: ${registration.first_name} ${registration.last_name}\nCompany: ${registration.company_name || 'N/A'}`
-      : `Mark this registration as PAID?\n\nName: ${registration.first_name} ${registration.last_name}\nCompany: ${registration.company_name || 'N/A'}`;
-
-    if (!window.confirm(confirmMsg)) return;
-
-    setTogglingPaymentId(registration.id);
-    setError(null);
-
-    try {
-      const response = await api.put(`/registrations/${registration.id}/toggle-payment`);
-      
-      // Update in both arrays
-      const updatedData = response.data;
-      setAllRegistrations(prevRegs => 
-        prevRegs.map(reg => reg.id === registration.id ? updatedData : reg)
-      );
-      setFilteredRegistrations(prevRegs => 
-        prevRegs.map(reg => reg.id === registration.id ? updatedData : reg)
-      );
-
-      const newStatus = response.data.payment_status;
-      alert(`Payment status updated to ${newStatus.toUpperCase()}`);
-
-    } catch (err) {
-      const errorMsg = err.response?.data?.error || err.response?.data?.message || "Failed to update payment status";
-      setError(errorMsg);
-      alert(errorMsg);
-      console.error("Payment toggle failed:", err.response || err);
-    } finally {
-      setTogglingPaymentId(null);
-    }
-  };
-
   const handleEditClick = (reg) => {
     setEditingRegistration(reg);
     setIsModalOpen(true);
@@ -318,33 +713,44 @@ export default function Registrations() {
       await api.put(`/registrations/${updatedReg.id}`, updatedReg);
       setIsModalOpen(false);
       setEditingRegistration(null);
-      fetchAllRegistrations(); // Reload all data
+      fetchAllRegistrations();
+      alert("✅ Registration updated successfully");
     } catch (error) {
-      alert("Failed to update registration. See console for details.");
+      if (error.response?.status === 409) {
+        alert(`❌ Update Failed:\n\n${error.response.data.error}\n\nPlease use a different name.`);
+      } else {
+        alert("❌ Failed to update registration. See console for details.");
+      }
       console.error("Update failed:", error.response || error);
     }
   };
 
-  const handleDelete = async (regId) => {
-    if (window.confirm("Are you sure you want to delete this registration permanently?")) {
-      try {
-        const response = await api.delete(`/registrations/${regId}`);
-        if (response.status === 204) {
-          alert("Registration deleted successfully.");
-          
-          // Remove from both arrays
-          setAllRegistrations(prev => prev.filter(reg => reg.id !== regId));
-          setFilteredRegistrations(prev => prev.filter(reg => reg.id !== regId));
-          
-          // Adjust current page if needed
-          if (currentRecords.length === 1 && currentPage > 1) {
-            setCurrentPage(currentPage - 1);
-          }
+  // Updated delete handler with modal
+  const handleDelete = (reg) => {
+    setRegistrationToDelete(reg);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!registrationToDelete) return;
+
+    try {
+      const response = await api.delete(`/registrations/${registrationToDelete.id}`);
+      if (response.status === 204) {
+        setAllRegistrations(prev => prev.filter(reg => reg.id !== registrationToDelete.id));
+        setFilteredRegistrations(prev => prev.filter(reg => reg.id !== registrationToDelete.id));
+        
+        if (currentRecords.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
         }
-      } catch (error) {
-        alert("Failed to delete registration. See console for details.");
-        console.error("Delete failed:", error.response || error);
+        
+        alert("✅ Registration deleted successfully");
       }
+    } catch (error) {
+      alert("❌ Failed to delete registration. See console for details.");
+      console.error("Delete failed:", error.response || error);
+    } finally {
+      setRegistrationToDelete(null);
     }
   };
 
@@ -363,24 +769,21 @@ export default function Registrations() {
       } else {
         window.open(badgeUrl, "_blank");
       }
-      fetchAllRegistrations(); // Reload data after printing
+      fetchAllRegistrations();
     } catch (err) {
       if (printWin) {
         try { printWin.close(); } catch (_) {}
       }
       const code = err.response?.status;
       const msg =
-        code === 404
-          ? "Ticket not found."
-          : code === 403
-          ? "Scan not allowed in current mode or permission denied."
-          : code === 409
-          ? "Reprint limit reached for this badge."
-          : err.response?.data?.error || err.response?.data?.message || "Scan/print failed.";
+        code === 404 ? "Ticket not found." :
+        code === 403 ? "Scan not allowed in current mode or permission denied." :
+        code === 409 ? "Reprint limit reached for this badge." :
+        err.response?.data?.error || err.response?.data?.message || "Scan/print failed.";
       setError(msg);
 
       if (code && code !== 401) {
-        const proceed = window.confirm(`${msg}\nOpen badge page anyway?`);
+        const proceed = window.confirm(`${msg}\n\nOpen badge page anyway?`);
         if (proceed) {
           const badgeUrl = `${backendBase}/registrations/${ticket}/badge?show_qr=false&print=true`;
           window.open(badgeUrl, "_blank");
@@ -391,7 +794,85 @@ export default function Registrations() {
     }
   };
 
-  // --- Button styles ---
+  // Render expanded row with full details
+  const renderExpandedRow = (reg) => {
+    return (
+      <tr style={{ backgroundColor: '#f8f9fa' }}>
+        <td colSpan="9" style={{ padding: '20px' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+            gap: '20px',
+            fontSize: '0.9rem'
+          }}>
+            {/* Personal Info */}
+            <div style={detailBoxStyle}>
+              <h4 style={detailTitleStyle}>👤 Personal Information</h4>
+              <div style={detailRowStyle}><strong>Email:</strong> {reg.email || 'Not provided'}</div>
+              <div style={detailRowStyle}><strong>Phone:</strong> {reg.phone || 'Not provided'}</div>
+              <div style={detailRowStyle}><strong>Address:</strong> {reg.address || 'Not provided'}</div>
+              <div style={detailRowStyle}><strong>Designation:</strong> {reg.designation || 'Not provided'}</div>
+            </div>
+
+            {/* Demographics */}
+            <div style={detailBoxStyle}>
+              <h4 style={detailTitleStyle}>📊 Demographics</h4>
+              <div style={detailRowStyle}><strong>Age Range:</strong> {reg.age_range || 'Not provided'}</div>
+              <div style={detailRowStyle}><strong>Gender:</strong> {reg.gender || 'Not provided'}</div>
+              {reg.gender === 'Others' && reg.gender_other && (
+                <div style={detailRowStyle}><strong>Gender (Other):</strong> {reg.gender_other}</div>
+              )}
+            </div>
+
+            {/* Survey - ICEGEX 2025 */}
+            <div style={detailBoxStyle}>
+              <h4 style={detailTitleStyle}>📝 Survey - ICEGEX 2025</h4>
+              <div style={detailRowStyle}><strong>Industry Sector:</strong> {reg.industry_sector || 'Not provided'}</div>
+              {reg.industry_sector === 'Others' && reg.industry_sector_other && (
+                <div style={{ ...detailRowStyle, fontSize: '0.85rem', color: '#666', marginLeft: '15px' }}>
+                  Specified: {reg.industry_sector_other}
+                </div>
+              )}
+              <div style={detailRowStyle}><strong>Reason for Attending:</strong> {reg.reason_for_attending || 'Not provided'}</div>
+              {reg.reason_for_attending === 'Others' && reg.reason_for_attending_other && (
+                <div style={{ ...detailRowStyle, fontSize: '0.85rem', color: '#666', marginLeft: '15px' }}>
+                  Specified: {reg.reason_for_attending_other}
+                </div>
+              )}
+            </div>
+
+            {/* Additional Survey */}
+            <div style={detailBoxStyle}>
+              <h4 style={detailTitleStyle}>💡 Additional Information</h4>
+              <div style={detailRowStyle}><strong>Areas of Interest:</strong> {reg.specific_areas_of_interest || 'Not provided'}</div>
+              {reg.specific_areas_of_interest === 'Others' && reg.specific_areas_of_interest_other && (
+                <div style={{ ...detailRowStyle, fontSize: '0.85rem', color: '#666', marginLeft: '15px' }}>
+                  Other: {reg.specific_areas_of_interest_other}
+                </div>
+              )}
+              <div style={detailRowStyle}><strong>How did you learn:</strong> {reg.how_did_you_learn_about || 'Not provided'}</div>
+              {reg.how_did_you_learn_about === 'Others' && reg.how_did_you_learn_about_other && (
+                <div style={{ ...detailRowStyle, fontSize: '0.85rem', color: '#666', marginLeft: '15px' }}>
+                  Other: {reg.how_did_you_learn_about_other}
+                </div>
+              )}
+            </div>
+
+            {/* System Info */}
+            <div style={detailBoxStyle}>
+              <h4 style={detailTitleStyle}>⚙️ System Information</h4>
+              <div style={detailRowStyle}><strong>Registered:</strong> {formatDate(reg.created_at)}</div>
+              <div style={detailRowStyle}><strong>Registered By:</strong> {reg.registered_by?.name || 'System'}</div>
+              <div style={detailRowStyle}><strong>Confirmed:</strong> {reg.confirmed ? `Yes (${formatDate(reg.confirmed_at)})` : 'No'}</div>
+              <div style={detailRowStyle}><strong>Server Mode:</strong> {reg.server_mode || 'N/A'}</div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  // Button styles
   const paginationButtonStyle = {
     padding: "8px 12px",
     backgroundColor: "#007bff",
@@ -409,21 +890,59 @@ export default function Registrations() {
     boxShadow: "0 2px 8px rgba(0,91,187,0.4)"
   };
 
-  // --- UI Rendering ---
-  if (authLoading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555" }}>⏳ Checking authorization...</p>;
+  const detailBoxStyle = {
+    padding: '15px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    border: '1px solid #dee2e6'
+  };
+
+  const detailTitleStyle = {
+    marginTop: 0,
+    color: '#007bff',
+    borderBottom: '2px solid #007bff',
+    paddingBottom: '8px',
+    marginBottom: '10px',
+    fontSize: '1rem'
+  };
+
+  const detailRowStyle = {
+    padding: '6px 0',
+    borderBottom: '1px solid #e9ecef',
+    fontSize: '0.9rem'
+  };
+
+  // UI Guards
+  if (authLoading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555", padding: "40px" }}>⏳ Checking authorization...</p>;
   if (!user) return <p style={{ color: "red", padding: "20px", textAlign: "center", fontSize: "1.2rem" }}>🔒 You must be logged in to view this page.</p>;
   if (!isAuthorized)
     return (
-      <div style={{ padding: "20px", color: "red", textAlign: "center", fontSize: "1.2rem" }}>
+      <div style={{ padding: "40px", color: "#721c24", backgroundColor: "#f8d7da", textAlign: "center", fontSize: "1.2rem", borderRadius: "8px", margin: "20px" }}>
         ❌ Access Denied. You do not have permission to view registrations.
       </div>
     );
 
-  if (loading) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555" }}>⏳ Loading registrations...</p>;
+  if (loading && allRegistrations.length === 0) return <p style={{ textAlign: "center", fontSize: "1.2rem", color: "#555", padding: "40px" }}>⏳ Loading registrations...</p>;
 
   return (
-    <div style={{ padding: "20px", maxWidth: "1400px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
-      <h2 style={{ fontSize: "1.8rem", marginBottom: "10px", color: "#333" }}>📋 Registrations</h2>
+    <div style={{ padding: "20px", maxWidth: "1600px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+        <h2 style={{ fontSize: "1.8rem", margin: 0, color: "#333" }}>📋 Registrations - ICEGEX 2025</h2>
+        <button onClick={fetchAllRegistrations} disabled={loading} style={{
+          padding: '10px 20px',
+          backgroundColor: '#28a745',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          fontSize: '0.95rem',
+          fontWeight: '600',
+          opacity: loading ? 0.6 : 1
+        }}>
+          🔄 Refresh
+        </button>
+      </div>
 
       {/* Error Display */}
       {error && (
@@ -433,133 +952,201 @@ export default function Registrations() {
           color: "#721c24",
           borderRadius: "4px",
           marginBottom: "15px",
-          border: "1px solid #f5c6cb"
+          border: "1px solid #f5c6cb",
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          ❌ {error}
+          <span>❌ {error}</span>
+          <button onClick={() => setError(null)} style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '1.2rem',
+            cursor: 'pointer',
+            color: '#721c24'
+          }}>✕</button>
         </div>
       )}
 
-      {/* ✅ Search and Sort Controls */}
+      {/* Search and Filters */}
       <div style={{
         padding: "15px",
         backgroundColor: "#ffffff",
         borderRadius: "8px",
         marginBottom: "20px",
         border: "1px solid #ddd",
-        display: "flex",
-        gap: "15px",
-        flexWrap: "wrap",
-        alignItems: "center"
       }}>
-        {/* Search Input */}
-        <div style={{ flex: "1 1 300px", minWidth: "250px" }}>
-          <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
-            🔍 Search
-          </label>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <input
-              type="text"
-              placeholder="Search by name, email, company, ticket..."
-              value={search}
-              onChange={handleSearchChange}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                border: "1px solid #ced4da",
-                borderRadius: "4px",
-                fontSize: "0.95rem",
-                outline: "none",
-                transition: "border-color 0.3s"
-              }}
-              onFocus={(e) => e.target.style.borderColor = "#007bff"}
-              onBlur={(e) => e.target.style.borderColor = "#ced4da"}
-            />
-            {search && (
-              <button
-                onClick={handleClearSearch}
+        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          {/* Search Input */}
+          <div style={{ flex: "1 1 300px", minWidth: "250px" }}>
+            <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
+              🔍 Search
+            </label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="text"
+                placeholder="Search by name, email, company, ticket..."
+                value={search}
+                onChange={handleSearchChange}
                 style={{
-                  padding: "10px 16px",
-                  backgroundColor: "#6c757d",
-                  color: "white",
-                  border: "none",
+                  flex: 1,
+                  padding: "10px 12px",
+                  border: "1px solid #ced4da",
                   borderRadius: "4px",
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                  transition: "background-color 0.3s"
+                  fontSize: "0.95rem",
+                  outline: "none"
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = "#5a6268"}
-                onMouseOut={(e) => e.target.style.backgroundColor = "#6c757d"}
-              >
-                ✕ Clear
-              </button>
-            )}
+              />
+              {search && (
+                <button
+                  onClick={handleClearSearch}
+                  style={{
+                    padding: "10px 16px",
+                    backgroundColor: "#6c757d",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "0.9rem"
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sort by ID */}
+          <div>
+            <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
+              📊 Sort
+            </label>
+            <button
+              onClick={handleToggleSort}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: "#17a2b8",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+                fontWeight: "600"
+              }}
+            >
+              {sortOrder === 'asc' ? '↑ Oldest First' : '↓ Newest First'}
+            </button>
+          </div>
+
+          {/* Show Filters Button */}
+          <div>
+            <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem", opacity: 0 }}>_</label>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: showFilters ? '#138496' : '#17a2b8',
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+                fontWeight: "600"
+              }}
+            >
+              🔍 {showFilters ? 'Hide' : 'Show'} Filters
+            </button>
           </div>
         </div>
 
-        {/* Sort by ID */}
-        <div style={{ flex: "0 0 auto" }}>
-          <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
-            📊 Sort by ID
-          </label>
-          <button
-            onClick={handleToggleSort}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "#17a2b8",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "0.95rem",
-              fontWeight: "600",
-              transition: "background-color 0.3s"
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = "#138496"}
-            onMouseOut={(e) => e.target.style.backgroundColor = "#17a2b8"}
-          >
-            {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
-          </button>
-        </div>
+        {/* Filters Panel */}
+        {showFilters && (
+          <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {/* Registration Type Filter */}
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
+                  Registration Type
+                </label>
+                <select
+                  value={filters.registrationType}
+                  onChange={(e) => setFilters(prev => ({ ...prev, registrationType: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: "10px",
+                    border: "1px solid #ced4da",
+                    borderRadius: "4px",
+                    fontSize: "0.95rem",
+                    backgroundColor: 'white'
+                  }}
+                >
+                  <option value="all">All Types</option>
+                  <option value="onsite">Onsite</option>
+                  <option value="online">Online</option>
+                  <option value="pre-registered">Pre-Registered</option>
+                  <option value="complimentary">Complimentary</option>
+                </select>
+              </div>
 
-        {/* Refresh Button */}
-        <div style={{ flex: "0 0 auto" }}>
-          <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem", opacity: 0 }}>
-            _
-          </label>
-          <button
-            onClick={fetchAllRegistrations}
-            disabled={loading}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "#28a745",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontSize: "0.95rem",
-              fontWeight: "600",
-              opacity: loading ? 0.6 : 1,
-              transition: "background-color 0.3s"
-            }}
-            onMouseOver={(e) => !loading && (e.target.style.backgroundColor = "#218838")}
-            onMouseOut={(e) => !loading && (e.target.style.backgroundColor = "#28a745")}
-          >
-            🔄 Refresh
-          </button>
-        </div>
+              {/* Payment Status Filter */}
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "600", fontSize: "0.9rem" }}>
+                  Payment Status
+                </label>
+                <select
+                  value={filters.paymentStatus}
+                  onChange={(e) => setFilters(prev => ({ ...prev, paymentStatus: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: "10px",
+                    border: "1px solid #ced4da",
+                    borderRadius: "4px",
+                    fontSize: "0.95rem",
+                    backgroundColor: 'white'
+                  }}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="paid">Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="complimentary">Complimentary</option>
+                </select>
+              </div>
 
-        {/* Active Filter Indicator */}
+              {/* Reset Filters */}
+              <div>
+                <button
+                  onClick={handleResetFilters}
+                  style={{
+                    padding: "10px 20px",
+                    backgroundColor: "#ffc107",
+                    color: "#212529",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "0.95rem",
+                    fontWeight: "600"
+                  }}
+                >
+                  ↺ Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Active Filters Indicator */}
+            {(filters.registrationType !== 'all' || filters.paymentStatus !== 'all') && (
+              <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#d1ecf1', borderRadius: '4px', fontSize: '0.9rem', color: '#0c5460' }}>
+                <strong>🔍 Active Filters:</strong> 
+                {filters.registrationType !== 'all' && <span style={{ marginLeft: '10px', padding: '2px 8px', backgroundColor: '#17a2b8', color: 'white', borderRadius: '12px', fontSize: '0.85rem' }}>Type: {formatRegistrationType(filters.registrationType)}</span>}
+                {filters.paymentStatus !== 'all' && <span style={{ marginLeft: '10px', padding: '2px 8px', backgroundColor: '#17a2b8', color: 'white', borderRadius: '12px', fontSize: '0.85rem' }}>Payment: {filters.paymentStatus.toUpperCase()}</span>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Search Results Info */}
         {search && (
-          <div style={{ 
-            flex: "1 1 100%", 
-            padding: "10px", 
-            backgroundColor: "#d1ecf1", 
-            borderRadius: "4px",
-            fontSize: "0.9rem",
-            color: "#0c5460"
-          }}>
-            <strong>🔍 Active Filter:</strong> Searching for "{search}" - 
-            Found <strong>{filteredRegistrations.length}</strong> of <strong>{allRegistrations.length}</strong> total registrations
+          <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#d1ecf1', borderRadius: '4px', fontSize: '0.9rem', color: '#0c5460' }}>
+            <strong>🔍 Search Results:</strong> Found <strong>{filteredRegistrations.length}</strong> of <strong>{allRegistrations.length}</strong> total registrations
           </div>
         )}
       </div>
@@ -588,7 +1175,12 @@ export default function Registrations() {
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ width: "14px", height: "14px", backgroundColor: "#6c757d", borderRadius: "3px" }}></span> Pre-Registered
           </span>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "14px", height: "14px", backgroundColor: "#28a745", borderRadius: "3px" }}></span> Complimentary
+          </span>
+
           <span style={{ margin: "0 10px", color: "#ddd" }}>|</span>
+
           {/* Payment Status */}
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ width: "14px", height: "14px", backgroundColor: "#28a745", borderRadius: "3px" }}></span> Paid
@@ -596,202 +1188,219 @@ export default function Registrations() {
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ width: "14px", height: "14px", backgroundColor: "#dc3545", borderRadius: "3px" }}></span> Unpaid
           </span>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "14px", height: "14px", backgroundColor: "#17a2b8", borderRadius: "3px" }}></span> Complimentary Payment
+          </span>
+
           {canEdit && (
             <span style={{ fontSize: "0.85rem", fontStyle: "italic", color: "#666" }}>
               (Click payment badge to toggle)
             </span>
           )}
-          <span style={{ margin: "0 10px", color: "#ddd" }}>|</span>
-          {/* Badge Status */}
-          <span style={{ fontWeight: "bold", color: "#6c757d" }}>Not Printed</span>
-          <span style={{ fontWeight: "bold", color: "#28a745" }}>Printed</span>
-          <span style={{ fontWeight: "bold", color: "#fd7e14" }}>Re-Printed</span>
         </div>
       </div>
 
       {/* Table */}
       <div style={{ overflowX: "auto", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "1000px", backgroundColor: 'white' }}>
           <thead>
             <tr style={{ backgroundColor: "#343a40", color: "white" }}>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>⋮</th>
               <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>
                 ID {sortOrder === 'asc' ? '↑' : '↓'}
               </th>
               <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Name</th>
               <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Company</th>
-              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Ticket</th>
+              <th style={{ padding: "12px", textAlign: "left", borderBottom: "2px solid #dee2e6" }}>Ticket #</th>
               <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Type</th>
               <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Payment</th>
-              <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Badge Status</th>
+              <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Badge</th>
               <th style={{ padding: "12px", textAlign: "center", borderBottom: "2px solid #dee2e6" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {currentRecords.length > 0 ? (
               currentRecords.map((reg, index) => (
-                <tr
-                  key={reg.id}
-                  style={{
-                    backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8f9fa",
-                    transition: "background-color 0.3s",
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = "#e2e6ea"}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? "#ffffff" : "#f8f9fa"}
-                >
-                  <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.id}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>
-                    {reg.first_name} {reg.last_name}
-                  </td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.company_name || "N/A"}</td>
-                  <td style={{ padding: "12px", borderBottom: "1px solid #ddd", fontSize: "0.85rem" }}>{reg.ticket_number}</td>
-                  
-                  {/* Registration Type */}
-                  <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
-                    <span
-                      style={{
-                        padding: "6px 12px", 
-                        borderRadius: "20px", 
-                        color: "white",
-                        backgroundColor: getTypeColor(reg.registration_type),
-                        fontSize: "0.85rem", 
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {formatRegistrationType(reg.registration_type)}
-                    </span>
-                  </td>
-
-                  {/* Payment Status */}
-                  <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
-                    <span
-                      onClick={() => canEdit && handleTogglePayment(reg)}
-                      style={{
-                        padding: "6px 12px", 
-                        borderRadius: "20px", 
-                        color: "white",
-                        backgroundColor: reg.payment_status === "paid" ? "#28a745" : "#dc3545",
-                        fontSize: "0.9rem", 
-                        fontWeight: "bold",
-                        cursor: canEdit ? "pointer" : "default",
-                        opacity: togglingPaymentId === reg.id ? 0.6 : 1,
-                        transition: "all 0.3s",
-                        display: "inline-block",
-                        userSelect: "none",
-                        border: canEdit ? "2px solid transparent" : "none",
-                      }}
-                      onMouseOver={(e) => {
-                        if (canEdit && togglingPaymentId !== reg.id) {
-                          e.target.style.border = "2px solid #fff";
-                          e.target.style.transform = "scale(1.05)";
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (canEdit) {
-                          e.target.style.border = "2px solid transparent";
-                          e.target.style.transform = "scale(1)";
-                        }
-                      }}
-                      title={canEdit ? `Click to toggle payment status` : reg.payment_status?.toUpperCase() || "UNPAID"}
-                    >
-                      {togglingPaymentId === reg.id 
-                        ? "..." 
-                        : (reg.payment_status?.toUpperCase() || "UNPAID")
-                      }
-                    </span>
-                  </td>
-                  
-                  {/* Badge Status */}
-                  <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
-                    <span
-                      style={{
-                        color: reg.badge_status_display?.color || '#6c757d',
-                        fontSize: "0.9rem",
-                        fontWeight: "bold",
-                        textTransform: 'uppercase'
-                      }}
-                    >
-                      {reg.badge_status_display?.text || 'UNKNOWN'}
-                    </span>
-                  </td>
-
-                  {/* Actions */}
-                  <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
-                    <div style={{ display: "flex", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => handlePrintBadge(reg)}
-                        disabled={printingId === reg.id}
+                <>
+                  <tr
+                    key={reg.id}
+                    style={{
+                      backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8f9fa",
+                      transition: "background-color 0.3s",
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = "#e2e6ea"}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? "#ffffff" : "#f8f9fa"}
+                  >
+                    {/* Expand Button */}
+                    <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>
+                      <button 
+                        onClick={() => toggleExpandRow(reg.id)}
                         style={{
-                          padding: "8px 12px", 
-                          backgroundColor: "#17a2b8", 
-                          color: "white", 
-                          border: "none", 
-                          borderRadius: "4px", 
-                          cursor: "pointer",
-                          opacity: printingId === reg.id ? 0.5 : 1, 
-                          transition: "background-color 0.3s",
-                          fontSize: "0.85rem"
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '1rem',
+                          color: '#007bff',
+                          padding: '4px 8px'
                         }}
-                        onMouseOver={(e) => e.target.style.backgroundColor = "#138496"}
-                        onMouseOut={(e) => e.target.style.backgroundColor = "#17a2b8"}
+                        title="View full details"
                       >
-                        {printingId === reg.id 
-                          ? "Printing…" 
-                          : (reg.badge_status?.name && reg.badge_status.name !== 'not_printed' ? "Re-Print Badge" : "Print Badge")
-                        }
+                        {expandedRowId === reg.id ? '▼' : '▶'}
                       </button>
+                    </td>
+                    
+                    <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.id}</td>
+                    <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>
+                      {reg.first_name} {reg.last_name}
+                    </td>
+                    <td style={{ padding: "12px", borderBottom: "1px solid #ddd" }}>{reg.company_name || "N/A"}</td>
+                    <td style={{ padding: "12px", borderBottom: "1px solid #ddd", fontSize: "0.85rem", fontFamily: 'monospace' }}>{reg.ticket_number}</td>
+                    
+                    {/* Registration Type */}
+                    <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
+                      <span
+                        style={{
+                          padding: "6px 12px", 
+                          borderRadius: "20px", 
+                          color: "white",
+                          backgroundColor: getTypeColor(reg.registration_type),
+                          fontSize: "0.85rem", 
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {formatRegistrationType(reg.registration_type)}
+                      </span>
+                    </td>
 
-                      {user.role?.permissions?.includes("edit-registration") && (
+                    {/* Payment Status */}
+                    <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
+                      <span
+                        onClick={() => canEdit && handlePaymentStatusChange(reg)} 
+                        style={{
+                          padding: "6px 12px", 
+                          borderRadius: "20px", 
+                          color: "white",
+                          backgroundColor: getPaymentColor(reg.payment_status),
+                          fontSize: "0.9rem", 
+                          fontWeight: "bold",
+                          cursor: canEdit ? "pointer" : "default",
+                          opacity: togglingPaymentId === reg.id ? 0.6 : 1,
+                          transition: "all 0.3s",
+                          display: "inline-block",
+                          userSelect: "none",
+                          border: canEdit ? "2px solid transparent" : "none",
+                        }}
+                        onMouseOver={(e) => {
+                          if (canEdit && togglingPaymentId !== reg.id) {
+                            e.target.style.border = "2px solid #fff";
+                            e.target.style.transform = "scale(1.05)";
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (canEdit) {
+                            e.target.style.border = "2px solid transparent";
+                            e.target.style.transform = "scale(1)";
+                          }
+                        }}
+                        title={canEdit ? `Click to change payment status (Current: ${reg.payment_status?.toUpperCase() || "UNPAID"})` : reg.payment_status?.toUpperCase() || "UNPAID"}
+                      >
+                        {togglingPaymentId === reg.id 
+                          ? "..." 
+                          : (reg.payment_status?.toUpperCase() || "UNPAID")
+                        }
+                      </span>
+                    </td>
+                    
+                    {/* Badge Status */}
+                    <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
+                      <span
+                        style={{
+                          color: getBadgeStatusColor(reg.badge_status?.name),
+                          fontSize: "0.9rem",
+                          fontWeight: "bold",
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {reg.badge_status?.name?.replace('_', ' ') || 'UNKNOWN'}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td style={{ padding: "12px", textAlign: "center", borderBottom: "1px solid #ddd" }}>
+                      <div style={{ display: "flex", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
                         <button
-                          onClick={() => handleEditClick(reg)}
+                          onClick={() => handlePrintBadge(reg)}
+                          disabled={printingId === reg.id}
                           style={{
                             padding: "8px 12px", 
-                            backgroundColor: "#ffc107", 
-                            color: "#212529", 
-                            border: "none", 
-                            borderRadius: "4px", 
-                            cursor: "pointer",
-                            transition: "background-color 0.3s",
-                            fontSize: "0.85rem"
-                          }}
-                          onMouseOver={(e) => e.target.style.backgroundColor = "#e0a800"}
-                          onMouseOut={(e) => e.target.style.backgroundColor = "#ffc107"}
-                        >
-                          Edit
-                        </button>
-                      )}
-
-                      {user.role?.permissions?.includes("delete-registration") && (
-                        <button
-                          onClick={() => handleDelete(reg.id)}
-                          style={{
-                            padding: "8px 12px", 
-                            backgroundColor: "#dc3545", 
+                            backgroundColor: "#17a2b8", 
                             color: "white", 
                             border: "none", 
                             borderRadius: "4px", 
                             cursor: "pointer",
+                            opacity: printingId === reg.id ? 0.5 : 1, 
                             transition: "background-color 0.3s",
                             fontSize: "0.85rem"
                           }}
-                          onMouseOver={(e) => e.target.style.backgroundColor = "#c82333"}
-                          onMouseOut={(e) => e.target.style.backgroundColor = "#dc3545"}
+                          title="Print Badge"
                         >
-                          Delete
+                          {printingId === reg.id ? "⏳" : "🖨️"}
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+
+                        {canEdit && (
+                          <button
+                            onClick={() => handleEditClick(reg)}
+                            style={{
+                              padding: "8px 12px", 
+                              backgroundColor: "#ffc107", 
+                              color: "#212529", 
+                              border: "none", 
+                              borderRadius: "4px", 
+                              cursor: "pointer",
+                              transition: "background-color 0.3s",
+                              fontSize: "0.85rem"
+                            }}
+                            title="Edit"
+                          >
+                            ✏️
+                          </button>
+                        )}
+
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDelete(reg)}
+                            style={{
+                              padding: "8px 12px", 
+                              backgroundColor: "#dc3545", 
+                              color: "white", 
+                              border: "none", 
+                              borderRadius: "4px", 
+                              cursor: "pointer",
+                              transition: "background-color 0.3s",
+                              fontSize: "0.85rem"
+                            }}
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  
+                  {/* Expanded Row */}
+                  {expandedRowId === reg.id && renderExpandedRow(reg)}
+                </>
               ))
             ) : (
               <tr>
-                <td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#6c757d" }}>
-                  {search ? (
+                <td colSpan="9" style={{ padding: "40px", textAlign: "center", color: "#6c757d" }}>
+                  {search || filters.registrationType !== 'all' || filters.paymentStatus !== 'all' ? (
                     <>
-                      🔍 No registrations found matching "{search}"
+                      🔍 No registrations found matching your filters
                       <br />
                       <button
-                        onClick={handleClearSearch}
+                        onClick={handleResetFilters}
                         style={{
                           marginTop: "10px",
                           padding: "8px 16px",
@@ -802,7 +1411,7 @@ export default function Registrations() {
                           cursor: "pointer"
                         }}
                       >
-                        Clear Search
+                        Clear All Filters
                       </button>
                     </>
                   ) : (
@@ -815,18 +1424,61 @@ export default function Registrations() {
         </table>
       </div>
 
-      {/* ✅ Pagination */}
+      {/* Pagination */}
       {renderPagination()}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Edit Registration">
+      {/* Edit Modal */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingRegistration(null);
+        }} 
+        title="Edit Registration"
+        size="large"
+      >
         {editingRegistration && (
           <EditRegistrationForm
             registration={editingRegistration}
             onSave={handleUpdateSave}
-            onCancel={() => setIsModalOpen(false)}
+            onCancel={() => {
+              setIsModalOpen(false);
+              setEditingRegistration(null);
+            }}
           />
         )}
       </Modal>
+
+      {/* Payment Status Modal */}
+      <PaymentStatusModal
+        isOpen={paymentModalOpen}
+        onClose={() => {
+          setPaymentModalOpen(false);
+          setSelectedRegistration(null);
+        }}
+        registration={selectedRegistration}
+        onConfirm={handlePaymentStatusUpdate}
+        isUpdating={togglingPaymentId === selectedRegistration?.id}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setRegistrationToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Registration"
+        message={`Are you sure you want to permanently delete this registration? 
+          
+Name: ${registrationToDelete?.first_name} ${registrationToDelete?.last_name}
+Company: ${registrationToDelete?.company_name || 'N/A'}
+          
+This action CANNOT be undone!`}
+        confirmText="Delete"
+        danger={true}
+      />
     </div>
   );
 }

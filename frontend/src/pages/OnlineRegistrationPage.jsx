@@ -4,9 +4,9 @@
  * ===========================================================
  * 🔹 Author: John Kenneth Buce
  * 🔹 Purpose: Handles event registration, QR generation, and display
- * 🔹 Connected API: Django/Laravel backend via Axios (`/api/registrations`)
+ * 🔹 Connected API:Laravel backend via Axios (`/api/registrations`)
  *
- * (Original comments omitted for brevity)
+ * ✅ Updated: Added demographics, survey fields, and email validation
  * ===========================================================
  */
 
@@ -21,7 +21,7 @@ const styles = {
   // Main Container
   container: {
     padding: "40px 20px",
-    maxWidth: "500px",
+    maxWidth: "700px",
     margin: "auto",
     fontFamily: "'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
     backgroundColor: "#ffffff",
@@ -36,13 +36,35 @@ const styles = {
     marginTop: "25px",
   },
   input: {
-    padding: "14px 18px",
-    fontSize: "16px",
-    borderRadius: "8px",
-    border: "1px solid #e0e0e0",
-    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
-    width: "100%",
-    boxSizing: "border-box",
+    width: '100%',
+    padding: '14px 18px',
+    fontSize: '16px',
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.3s, box-shadow 0.3s',
+  },
+  select: {
+    width: '100%',
+    padding: '14px 18px',
+    fontSize: '16px',
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    boxSizing: 'border-box',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    transition: 'border-color 0.3s, box-shadow 0.3s',
+  },
+  textarea: {
+    width: '100%',
+    padding: '14px 18px',
+    fontSize: '16px',
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    boxSizing: 'border-box',
+    fontFamily: "'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    resize: 'vertical',
+    minHeight: '80px',
   },
   // Base button style
   button: {
@@ -110,108 +132,164 @@ const styles = {
     color: "#6c757d",
     marginTop: "5px",
   },
-  // ✅ NEW: Confirmation Modal Styles
+  // Section styles
+  section: {
+    marginBottom: "20px",
+    padding: "20px",
+    backgroundColor: "#f8f9fa",
+    borderRadius: "8px",
+    border: "1px solid #e0e0e0",
+  },
+  sectionTitle: {
+    fontSize: "18px",
+    fontWeight: "700",
+    color: "#007bff",
+    marginBottom: "15px",
+    paddingBottom: "10px",
+    borderBottom: "2px solid #007bff",
+  },
+  optionalBadge: {
+    display: "inline-block",
+    padding: "4px 12px",
+    backgroundColor: "#28a745",
+    color: "white",
+    borderRadius: "20px",
+    fontSize: "12px",
+    fontWeight: "600",
+    marginLeft: "10px",
+  },
+  helpText: {
+    fontSize: "14px",
+    color: "#6c757d",
+    marginBottom: "15px",
+    padding: "10px",
+    backgroundColor: "#e7f3ff",
+    borderRadius: "6px",
+    borderLeft: "4px solid #17a2b8",
+  },
+  // ✅ NEW: Email validation styles
+  fieldWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  fieldError: {
+    color: '#dc3545',
+    fontSize: '14px',
+    fontWeight: '600',
+    marginTop: '-4px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+  },
+  fieldSuccess: {
+    color: '#28a745',
+    fontSize: '14px',
+    fontWeight: '600',
+    marginTop: '-4px',
+  },
+  // ✅ Confirmation Modal Styles
   modalOverlay: {
-    position: "fixed",
+    position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 9999,
-    padding: "20px",
+    padding: '20px',
   },
   modalContent: {
-    backgroundColor: "#ffffff",
-    borderRadius: "12px",
-    padding: "30px",
-    maxWidth: "500px",
-    width: "100%",
-    maxHeight: "90vh",
-    overflowY: "auto",
-    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
-    animation: "slideIn 0.3s ease-out",
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+    padding: '30px',
+    maxWidth: '600px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+    animation: 'slideIn 0.3s ease-out',
   },
   modalHeader: {
-    fontSize: "24px",
-    fontWeight: "700",
-    color: "#343a40",
-    marginBottom: "20px",
-    textAlign: "center",
-    borderBottom: "2px solid #e0e0e0",
-    paddingBottom: "15px",
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#343a40',
+    marginBottom: '20px',
+    textAlign: 'center',
+    borderBottom: '2px solid #e0e0e0',
+    paddingBottom: '15px',
   },
   infoSection: {
-    backgroundColor: "#f8f9fa",
-    padding: "20px",
-    borderRadius: "8px",
-    marginBottom: "20px",
+    backgroundColor: '#f8f9fa',
+    padding: '20px',
+    borderRadius: '8px',
+    marginBottom: '20px',
   },
   infoRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "10px 0",
-    borderBottom: "1px solid #e0e0e0",
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '10px 0',
+    borderBottom: '1px solid #e0e0e0',
   },
   infoLabel: {
-    fontWeight: "600",
-    color: "#6c757d",
-    minWidth: "120px",
+    fontWeight: '600',
+    color: '#6c757d',
+    minWidth: '120px',
   },
   infoValue: {
-    color: "#212529",
-    textAlign: "right",
+    color: '#212529',
+    textAlign: 'right',
     flex: 1,
-    wordBreak: "break-word",
+    wordBreak: 'break-word',
   },
   warningBox: {
-    backgroundColor: "#fff3cd",
-    border: "2px solid #ffc107",
-    borderRadius: "8px",
-    padding: "15px",
-    marginBottom: "25px",
+    backgroundColor: '#fff3cd',
+    border: '2px solid #ffc107',
+    borderRadius: '8px',
+    padding: '15px',
+    marginBottom: '25px',
   },
   warningIcon: {
-    fontSize: "24px",
-    marginRight: "10px",
-    verticalAlign: "middle",
+    fontSize: '24px',
+    marginRight: '10px',
+    verticalAlign: 'middle',
   },
   warningText: {
-    color: "#856404",
-    fontSize: "15px",
-    lineHeight: "1.5",
+    color: '#856404',
+    fontSize: '15px',
+    lineHeight: '1.5',
   },
   modalButtons: {
-    display: "flex",
-    gap: "15px",
-    justifyContent: "center",
-    marginTop: "25px",
+    display: 'flex',
+    gap: '15px',
+    justifyContent: 'center',
+    marginTop: '25px',
   },
   confirmButton: {
-    backgroundColor: "#28a745",
-    color: "#ffffff",
-    padding: "12px 30px",
-    fontSize: "16px",
-    fontWeight: "600",
-    borderRadius: "8px",
-    border: "none",
-    cursor: "pointer",
-    transition: "all 0.3s ease",
-    boxShadow: "0 4px 10px rgba(40, 167, 69, 0.3)",
+    backgroundColor: '#28a745',
+    color: '#ffffff',
+    padding: '12px 30px',
+    fontSize: '16px',
+    fontWeight: '600',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 10px rgba(40, 167, 69, 0.3)',
   },
   cancelButton: {
-    backgroundColor: "#6c757d",
-    color: "#ffffff",
-    padding: "12px 30px",
-    fontSize: "16px",
-    fontWeight: "600",
-    borderRadius: "8px",
-    border: "none",
-    cursor: "pointer",
-    transition: "all 0.3s ease",
+    backgroundColor: '#6c757d',
+    color: '#ffffff',
+    padding: '12px 30px',
+    fontSize: '16px',
+    fontWeight: '600',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
   },
 };
 
@@ -226,20 +304,44 @@ const useHover = (initialStyle, hoverStyle) => {
 };
 
 // ===========================================================
-// ✅ NEW: Confirmation Modal Component
+// ✅ Confirmation Modal Component
 // ===========================================================
 const ConfirmationModal = ({ isOpen, formData, onConfirm, onCancel }) => {
   if (!isOpen) return null;
 
-  // Format display values
+  // Format display values - only show filled fields
   const displayData = [
     { label: "First Name", value: formData.first_name, required: true },
     { label: "Last Name", value: formData.last_name, required: true },
     { label: "Email", value: formData.email || "Not provided" },
     { label: "Phone", value: formData.phone || "Not provided" },
     { label: "Address", value: formData.address || "Not provided" },
-    { label: "Company", value: formData.company_name, required: true },
+    { label: "Company", value: formData.company_name || "Not provided" },
+    { label: "Designation", value: formData.designation || "Not provided" },
   ];
+
+  // Optional fields (only show if filled)
+  const optionalData = [];
+  
+  if (formData.age_range) {
+    optionalData.push({ label: "Age Range", value: formData.age_range });
+  }
+  if (formData.gender) {
+    optionalData.push({ 
+      label: "Gender", 
+      value: formData.gender === "Others" && formData.gender_other 
+        ? `Others: ${formData.gender_other}` 
+        : formData.gender 
+    });
+  }
+  if (formData.industry_sector) {
+    optionalData.push({ 
+      label: "Industry", 
+      value: formData.industry_sector === "Others" && formData.industry_sector_other 
+        ? `Others: ${formData.industry_sector_other}` 
+        : formData.industry_sector 
+    });
+  }
 
   return (
     <div style={styles.modalOverlay} onClick={onCancel}>
@@ -248,10 +350,12 @@ const ConfirmationModal = ({ isOpen, formData, onConfirm, onCancel }) => {
         
         <div style={styles.infoSection}>
           <h3 style={{ marginBottom: "15px", color: "#343a40" }}>Please review your information:</h3>
+          
+          {/* Required Fields */}
           {displayData.map((item, index) => (
             <div key={index} style={{
               ...styles.infoRow,
-              borderBottom: index === displayData.length - 1 ? "none" : "1px solid #e0e0e0"
+              borderBottom: index === displayData.length - 1 && optionalData.length === 0 ? "none" : "1px solid #e0e0e0"
             }}>
               <span style={styles.infoLabel}>
                 {item.label}{item.required && <span style={{ color: "#dc3545" }}> *</span>}:
@@ -265,6 +369,24 @@ const ConfirmationModal = ({ isOpen, formData, onConfirm, onCancel }) => {
               </span>
             </div>
           ))}
+
+          {/* Optional Fields */}
+          {optionalData.length > 0 && (
+            <>
+              <div style={{ margin: "15px 0", paddingTop: "15px", borderTop: "2px solid #dee2e6" }}>
+                <h4 style={{ fontSize: "14px", color: "#6c757d", marginBottom: "10px" }}>Additional Information:</h4>
+              </div>
+              {optionalData.map((item, index) => (
+                <div key={index} style={{
+                  ...styles.infoRow,
+                  borderBottom: index === optionalData.length - 1 ? "none" : "1px solid #e0e0e0"
+                }}>
+                  <span style={styles.infoLabel}>{item.label}:</span>
+                  <span style={styles.infoValue}>{item.value}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         <div style={styles.warningBox}>
@@ -288,12 +410,12 @@ const ConfirmationModal = ({ isOpen, formData, onConfirm, onCancel }) => {
             onClick={onCancel}
             style={styles.cancelButton}
             onMouseOver={(e) => {
-              e.target.style.backgroundColor = "#5a6268";
-              e.target.style.transform = "translateY(-2px)";
+              e.target.style.backgroundColor = '#5a6268';
+              e.target.style.transform = 'translateY(-2px)';
             }}
             onMouseOut={(e) => {
-              e.target.style.backgroundColor = "#6c757d";
-              e.target.style.transform = "translateY(0)";
+              e.target.style.backgroundColor = '#6c757d';
+              e.target.style.transform = 'translateY(0)';
             }}
           >
             ← Go Back & Edit
@@ -302,14 +424,14 @@ const ConfirmationModal = ({ isOpen, formData, onConfirm, onCancel }) => {
             onClick={onConfirm}
             style={styles.confirmButton}
             onMouseOver={(e) => {
-              e.target.style.backgroundColor = "#218838";
-              e.target.style.transform = "translateY(-2px)";
-              e.target.style.boxShadow = "0 6px 15px rgba(40, 167, 69, 0.4)";
+              e.target.style.backgroundColor = '#218838';
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 6px 15px rgba(40, 167, 69, 0.4)';
             }}
             onMouseOut={(e) => {
-              e.target.style.backgroundColor = "#28a745";
-              e.target.style.transform = "translateY(0)";
-              e.target.style.boxShadow = "0 4px 10px rgba(40, 167, 69, 0.3)";
+              e.target.style.backgroundColor = '#28a745';
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 4px 10px rgba(40, 167, 69, 0.3)';
             }}
           >
             ✓ Yes, Submit Registration
@@ -326,16 +448,47 @@ export default function OnlineRegistrationPage() {
   const [locked, setLocked] = useState(false);
   const [settings, setSettings] = useState(null);
   const [fadeOut, setFadeOut] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false); // ✅ NEW: Confirmation modal state
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [emailError, setEmailError] = useState(""); // ✅ NEW: Email validation error
 
+  // ✅ All form fields
   const [form, setForm] = useState({
+    // Personal Info
     first_name: "",
     last_name: "",
     email: "",
     phone: "",
     address: "",
     company_name: "",
+    designation: "",
+    
+    // Demographics
+    age_range: "",
+    gender: "",
+    gender_other: "",
+    
+    // Survey Questions
+    industry_sector: "",
+    industry_sector_other: "",
+    reason_for_attending: "",
+    reason_for_attending_other: "",
+    specific_areas_of_interest: "",
+    specific_areas_of_interest_other: "",
+    how_did_you_learn_about: "",
+    how_did_you_learn_about_other: "",
+    
+    // System Info
     registration_type: "online",
+    payment_status: "unpaid",
+  });
+
+  // ✅ Track "Others" field visibility
+  const [showOtherFields, setShowOtherFields] = useState({
+    gender: false,
+    industry: false,
+    reason: false,
+    interest: false,
+    learn: false
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -446,6 +599,23 @@ export default function OnlineRegistrationPage() {
     );
   };
 
+  // ✅ NEW: Email validation function
+  const validateEmail = (email) => {
+    if (!email.trim()) {
+      setEmailError("");
+      return true; // Empty is valid (field is optional)
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError("❌ Invalid email format. Please enter a valid email address.");
+      return false;
+    }
+    
+    setEmailError("");
+    return true;
+  };
+
   /** 🔐 Device Lock Initialization */
   useEffect(() => {
     const saved = localStorage.getItem("regData");
@@ -485,18 +655,59 @@ export default function OnlineRegistrationPage() {
     checkServerMode();
   }, []);
 
+  // ✅ UPDATED: Handle form changes including "Others" toggles and email validation
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+
+    // ✅ NEW: Validate email on change
+    if (name === "email") {
+      validateEmail(value);
+    }
+
+    // Handle "Others" field toggles
+    if (name === "gender") {
+      setShowOtherFields(prev => ({ ...prev, gender: value === "Others" }));
+      if (value !== "Others") setForm(f => ({ ...f, gender_other: "" }));
+    }
+    
+    if (name === "industry_sector") {
+      setShowOtherFields(prev => ({ ...prev, industry: value === "Others" }));
+      if (value !== "Others") setForm(f => ({ ...f, industry_sector_other: "" }));
+    }
+    
+    if (name === "reason_for_attending") {
+      setShowOtherFields(prev => ({ ...prev, reason: value === "Others" }));
+      if (value !== "Others") setForm(f => ({ ...f, reason_for_attending_other: "" }));
+    }
+    
+    if (name === "specific_areas_of_interest") {
+      setShowOtherFields(prev => ({ ...prev, interest: value === "Others" }));
+      if (value !== "Others") setForm(f => ({ ...f, specific_areas_of_interest_other: "" }));
+    }
+    
+    if (name === "how_did_you_learn_about") {
+      setShowOtherFields(prev => ({ ...prev, learn: value === "Others" }));
+      if (value !== "Others") setForm(f => ({ ...f, how_did_you_learn_about_other: "" }));
+    }
   };
 
-  // ✅ UPDATED: Show confirmation modal instead of direct submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (locked) return;
 
     // Basic validation
     if (!form.first_name.trim() || !form.last_name.trim() || !form.company_name.trim()) {
-      setError("Please fill in all required fields.");
+      setError("Please fill in all required fields (First Name, Last Name, and Company).");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // ✅ NEW: Validate email if provided
+    if (form.email.trim() && !validateEmail(form.email)) {
+      setError("❌ Please provide a valid email address or leave the field empty.");
+      // Scroll to email field
+      document.querySelector('input[name="email"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -504,7 +715,7 @@ export default function OnlineRegistrationPage() {
     setShowConfirmation(true);
   };
 
-  // ✅ NEW: Handle confirmed submission
+  // Handle confirmed submission
   const handleConfirmedSubmit = async () => {
     setShowConfirmation(false);
     setIsSubmitting(true);
@@ -537,14 +748,28 @@ export default function OnlineRegistrationPage() {
       setLocked(true);
       setSuccessfulReg(reg);
     } catch (err) {
-      setError(getErrorMessage(err));
+      const status = err.response?.status;
+      const errorData = err.response?.data;
+      
+      if (status === 409) {
+        setError(`❌ ${errorData.error || 'This person is already registered.'}\n\nPlease verify the name or contact support.`);
+      } else if (status === 422 && errorData.errors?.email) {
+        // ✅ Handle Laravel validation error for email
+        setError(`❌ ${errorData.errors.email[0]}`);
+        setEmailError(errorData.errors.email[0]);
+        document.querySelector('input[name="email"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        setError(getErrorMessage(err));
+      }
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setPreparingQr(false);
       setIsSubmitting(false);
     }
   };
 
-  // ✅ NEW: Handle cancel confirmation
+  // Handle cancel confirmation
   const handleCancelConfirmation = () => {
     setShowConfirmation(false);
   };
@@ -648,76 +873,296 @@ export default function OnlineRegistrationPage() {
   return (
     <div style={styles.container}>
       <h1 style={{ color: "#343a40", borderBottom: "2px solid #007bff", paddingBottom: "10px", marginBottom: "20px" }}>
-        Event Registration
+        📝 Event Registration - ICEGEX 2025
       </h1>
       {error && <p style={styles.error}>{error}</p>}
 
-      <form
-        onSubmit={handleSubmit}
-        style={styles.form}
-      >
-        <input
-          name="first_name"
-          value={form.first_name}
-          onChange={handleChange}
-          placeholder="First Name *"
-          required
-          style={styles.input}
-        />
-        <input
-          name="last_name"
-          value={form.last_name}
-          onChange={handleChange}
-          placeholder="Last Name *"
-          required
-          style={styles.input}
-        />
-        <input
-          name="email"
-          value={form.email}
-          onChange={handleChange}
-          placeholder="Email Address (Optional)"
-          type="email"
-          style={styles.input}
-        />
-        <input
-          name="phone"
-          value={form.phone}
-          onChange={handleChange}
-          placeholder="Phone (Optional)"
-          style={styles.input}
-        />
-        <input
-          name="address"
-          value={form.address}
-          onChange={handleChange}
-          placeholder="Address (Optional)"
-          style={styles.input}
-        />
-        <input
-          name="company_name"
-          value={form.company_name}
-          onChange={handleChange}
-          placeholder="Company/Organization *"
-          required
-          style={styles.input}
-        />
+      <form onSubmit={handleSubmit} style={styles.form}>
+        
+        {/* SECTION 1: Personal Information */}
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>👤 Personal Information</h3>
+          
+          <input
+            name="first_name"
+            value={form.first_name}
+            onChange={handleChange}
+            placeholder="First Name *"
+            required
+            style={styles.input}
+          />
+          
+          <input
+            name="last_name"
+            value={form.last_name}
+            onChange={handleChange}
+            placeholder="Last Name *"
+            required
+            style={styles.input}
+          />
+          
+          {/* ✅ Email with Validation */}
+          <div style={styles.fieldWrapper}>
+            <input
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="Email Address (Optional)"
+              type="email"
+              style={{
+                ...styles.input,
+                ...(emailError ? { borderColor: '#dc3545', borderWidth: '2px' } : {})
+              }}
+            />
+            {/* ✅ Email Error Message */}
+            {emailError && (
+              <span style={styles.fieldError}>
+                {emailError}
+              </span>
+            )}
+            {/* ✅ Email Success Message */}
+            {!emailError && form.email.trim() && (
+              <span style={styles.fieldSuccess}>
+                ✓ Valid email format
+              </span>
+            )}
+          </div>
+          
+          <input
+            name="phone"
+            value={form.phone}
+            onChange={handleChange}
+            placeholder="Phone Number (Optional)"
+            style={styles.input}
+          />
+          
+          <input
+            name="address"
+            value={form.address}
+            onChange={handleChange}
+            placeholder="Address (Optional)"
+            style={styles.input}
+          />
+          
+          <input
+            name="company_name"
+            value={form.company_name}
+            onChange={handleChange}
+            placeholder="Company/Organization *"
+            required
+            style={styles.input}
+          />
+          
+          <input
+            name="designation"
+            value={form.designation}
+            onChange={handleChange}
+            placeholder="Designation/Job Title (Optional)"
+            style={styles.input}
+          />
+        </div>
+
+        {/* SECTION 2: Demographics (Optional) */}
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>
+            📊 Demographics
+            <span style={styles.optionalBadge}>Optional</span>
+          </h3>
+          <p style={styles.helpText}>
+            This information helps us understand our attendees better and improve future events.
+          </p>
+          
+          <select
+            name="age_range"
+            value={form.age_range}
+            onChange={handleChange}
+            style={styles.select}
+          >
+            <option value="">-- Select Age Range --</option>
+            <option value="18-24">18-24</option>
+            <option value="25-34">25-34</option>
+            <option value="35-44">35-44</option>
+            <option value="45-54">45-54</option>
+            <option value="55-64">55-64</option>
+            <option value="65+">65+</option>
+          </select>
+          
+          <select
+            name="gender"
+            value={form.gender}
+            onChange={handleChange}
+            style={styles.select}
+          >
+            <option value="">-- Select Gender --</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Prefer not to say">Prefer not to say</option>
+            <option value="Others">Others</option>
+          </select>
+          
+          {showOtherFields.gender && (
+            <input
+              name="gender_other"
+              placeholder="Please specify your gender"
+              value={form.gender_other}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          )}
+        </div>
+
+        {/* SECTION 3: Event Survey (Optional) */}
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>
+            📝 Event Survey
+            <span style={styles.optionalBadge}>Optional</span>
+          </h3>
+          <p style={styles.helpText}>
+            Help us serve you better! Your responses will help us tailor the event to your interests.
+          </p>
+          
+          {/* Industry Sector */}
+          <select
+            name="industry_sector"
+            value={form.industry_sector}
+            onChange={handleChange}
+            style={styles.select}
+          >
+            <option value="">-- Select Industry Sector --</option>
+            <option value="Ice Cream / Gelato / Frozen Dessert Brand">Ice Cream / Gelato / Frozen Dessert Brand</option>
+            <option value="Café / Bakery / Beverage or Dessert Shop">Café / Bakery / Beverage or Dessert Shop</option>
+            <option value="Restaurant / Catering / Food Chain">Restaurant / Catering / Food Chain</option>
+            <option value="Hotel / Resort / Hospitality">Hotel / Resort / Hospitality</option>
+            <option value="Food or Dairy Manufacturer / Supplier">Food or Dairy Manufacturer / Supplier</option>
+            <option value="Equipment / Packaging / Technology Provider">Equipment / Packaging / Technology Provider</option>
+            <option value="Marketing / Events / Creative Services">Marketing / Events / Creative Services</option>
+            <option value="Entrepreneur">Entrepreneur</option>
+            <option value="Student">Student</option>
+            <option value="General Visitor">General Visitor</option>
+            <option value="Others">Others</option>
+          </select>
+          
+          {showOtherFields.industry && (
+            <input
+              name="industry_sector_other"
+              placeholder="Please specify your industry"
+              value={form.industry_sector_other}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          )}
+          
+          {/* Reason for Attending */}
+          <select
+            name="reason_for_attending"
+            value={form.reason_for_attending}
+            onChange={handleChange}
+            style={styles.select}
+          >
+            <option value="">-- Reason for Attending --</option>
+            <option value="Discover new ice cream, gelato, or soft serve products">Discover new ice cream, gelato, or soft serve products</option>
+            <option value="Source ingredients, equipment, or packaging">Source ingredients, equipment, or packaging</option>
+            <option value="Learn from demos, talks, or competitions">Learn from demos, talks, or competitions</option>
+            <option value="Explore franchise or business opportunities">Explore franchise or business opportunities</option>
+            <option value="Meet potential partners or suppliers">Meet potential partners or suppliers</option>
+            <option value="Scout the event for future participation">Scout the event for future participation</option>
+            <option value="Others">Others</option>
+          </select>
+          
+          {showOtherFields.reason && (
+            <textarea
+              name="reason_for_attending_other"
+              placeholder="Please specify your reason for attending"
+              value={form.reason_for_attending_other}
+              onChange={handleChange}
+              style={styles.textarea}
+            />
+          )}
+          
+          {/* Areas of Interest */}
+          <select
+            name="specific_areas_of_interest"
+            value={form.specific_areas_of_interest}
+            onChange={handleChange}
+            style={styles.select}
+          >
+            <option value="">-- Areas of Interest --</option>
+            <option value="Ingredients / Flavor Innovations">Ingredients / Flavor Innovations</option>
+            <option value="Machinery & Equipment">Machinery & Equipment</option>
+            <option value="Packaging & Cold Chain">Packaging & Cold Chain</option>
+            <option value="Toll Manufacturing">Toll Manufacturing</option>
+            <option value="Retail Concepts & Franchises">Retail Concepts & Franchises</option>
+            <option value="Gelato Techniques & Training">Gelato Techniques & Training</option>
+            <option value="Dairy-based Products">Dairy-based Products</option>
+            <option value="Non-Dairy / Vegan options">Non-Dairy / Vegan options</option>
+            <option value="Others">Others</option>
+          </select>
+          
+          {showOtherFields.interest && (
+            <textarea
+              name="specific_areas_of_interest_other"
+              placeholder="Please specify your areas of interest"
+              value={form.specific_areas_of_interest_other}
+              onChange={handleChange}
+              style={styles.textarea}
+            />
+          )}
+          
+          {/* How did you learn */}
+          <select
+            name="how_did_you_learn_about"
+            value={form.how_did_you_learn_about}
+            onChange={handleChange}
+            style={styles.select}
+          >
+            <option value="">-- How did you learn about us? --</option>
+            <option value="Ads on Facebook / Instagram">Ads on Facebook / Instagram</option>
+            <option value="ICEGEX Official Page/Website / Social Media">ICEGEX Official Page/Website / Social Media</option>
+            <option value="Email Invitation or Newsletter">Email Invitation or Newsletter</option>
+            <option value="Word of Mouth (Family / Friends / Colleagues)">Word of Mouth (Family / Friends / Colleagues)</option>
+            <option value="Exhibitor / Brand Partner Invitation">Exhibitor / Brand Partner Invitation</option>
+            <option value="Media Feature or Influencer Affiliates">Media Feature or Influencer Affiliates</option>
+            <option value="Industry Association / Government Agency">Industry Association / Government Agency</option>
+            <option value="Event Listing Sites">Event Listing Sites</option>
+            <option value="Posters / Billboards / Flyers">Posters / Billboards / Flyers</option>
+            <option value="Others">Others</option>
+          </select>
+          
+          {showOtherFields.learn && (
+            <textarea
+              name="how_did_you_learn_about_other"
+              placeholder="Please specify how you learned about us"
+              value={form.how_did_you_learn_about_other}
+              onChange={handleChange}
+              style={styles.textarea}
+            />
+          )}
+        </div>
+
+        {/* Submit Button */}
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !!emailError}
           style={
-            isSubmitting 
+            (isSubmitting || !!emailError)
                 ? { ...styles.button, ...styles.disabledButton } 
                 : { ...styles.button, ...registerButtonStyle }
           }
-          onMouseEnter={!isSubmitting ? registerOnMouseEnter : null}
-          onMouseLeave={!isSubmitting ? registerOnMouseLeave : null}
+          onMouseEnter={(!isSubmitting && !emailError) ? registerOnMouseEnter : null}
+          onMouseLeave={(!isSubmitting && !emailError) ? registerOnMouseLeave : null}
         >
           {isSubmitting ? "Processing..." : "Register Now"}
         </button>
+
+        {/* ✅ Show message if email error prevents submission */}
+        {emailError && (
+          <p style={{ textAlign: 'center', color: '#dc3545', fontSize: '0.9rem', marginTop: '10px' }}>
+            ⚠️ Please fix the email error above before submitting
+          </p>
+        )}
       </form>
 
-      {/* ✅ NEW: Confirmation Modal */}
+      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={showConfirmation}
         formData={form}

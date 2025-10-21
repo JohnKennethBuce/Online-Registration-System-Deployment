@@ -1,3 +1,531 @@
+I have to Integrate this new form to our system. ignore All that is existing I typed it down in detailed so you have idea on the Design of our Existing. We will going to start on the Backend(laravel) migration, model, Controller, api. we will integrate these on our frontend (react) later
+
+
+
+Here's our the form we are Examining to Integrate with our Backend
+
+
+
+email (existing)
+
+answer(textbox)
+
+first_name (existing)
+
+answer(textbox)
+
+last_name (existing)
+
+answer(textbox)
+
+age_range dropdown (new)
+
+18-24
+
+25-34
+
+35-44
+
+45-54
+
+55-64
+
+65+
+
+gender dropdown(new)
+
+Male
+
+female
+
+prefer not to say 
+
+Others (Textbox will be displayed if it's Chosen in the Dropdown)
+
+company name(existing)
+
+answer(textbox)
+
+designation(new)
+
+answer(textbox n/a if not applicable)
+
+industry_sector dropdown (new)
+
+To many we will going to create this in frontend instead. We will going to put it on table as text, Like we will Create some dropdown on frontend then that will be considered the input to the field
+
+Others (Textbox will be displayed if it's Chosen in the Dropdown)
+
+Mobile Number(existing)
+
+Answer(textbox)
+
+City where your business is located(existing we just need to rename the frontend let's just keep this address on the backend) 
+
+Answer(textbox)
+
+Reason_for_Attending Dropdown(new)
+
+same as industry_sector dropdown will be set up on frontend
+
+Others (Textbox will be displayed if it's Chosen in the Dropdown) 
+
+Specific_Areas_of_Interest(new)
+
+same as industry_sector dropdown will be set up on frontend
+
+Others (Textbox will be displayed if it's Chosen in the Dropdown) 
+
+How_did_you_learn_about(new)
+
+same as industry_sector dropdown will be set up on frontend
+
+Others (Textbox will be displayed if it's Chosen in the Dropdown) 
+
+then submit button (existing)
+
+
+
+if you have recommendations You can suggest what's the best action for this 
+
+
+
+Here's my current existing Backend 
+
+
+
+C:\xampp\htdocs\Online-Registration-System\backend\database\migrations 
+
+
+
+<?php
+
+
+
+use Illuminate\Database\Migrations\Migration;
+
+use Illuminate\Database\Schema\Blueprint;
+
+use Illuminate\Support\Facades\Schema;
+
+
+
+return new class extends Migration {
+
+    public function up(): void
+
+    {
+
+        Schema::create('registrations', function (Blueprint $table) {
+
+            $table->id();
+
+
+
+            // Encrypted personal info
+
+            $table->text('first_name');
+
+            $table->text('last_name');
+
+            $table->text('email')->nullable();
+
+            $table->string('email_hash', 64)->unique()->nullable();
+
+            $table->text('phone')->nullable();
+
+            $table->text('address')->nullable();
+
+            $table->text('company_name');
+
+
+
+            $table->enum('registration_type', ['onsite','online','pre-registered'])->index();
+
+
+
+            // Ticket / QR
+
+            $table->string('ticket_number', 100)->unique()->nullable();
+
+            $table->string('qr_code_path', 255)->nullable();
+
+
+
+            $table->enum('server_mode', ['onsite','online','both'])->default('onsite')->index();
+
+
+
+            // Print statuses
+
+            $table->foreignId('badge_printed_status_id')->nullable()
+
+                  ->constrained('print_statuses')->nullOnDelete();
+
+            $table->foreignId('ticket_printed_status_id')->nullable()
+
+                  ->constrained('print_statuses')->nullOnDelete();
+
+
+
+            // Confirmation
+
+            $table->boolean('confirmed')->default(false);
+
+            $table->foreignId('confirmed_by')->nullable()
+
+                  ->constrained('users')->nullOnDelete();
+
+            $table->timestamp('confirmed_at')->nullable();
+
+
+
+            // Who registered
+
+            $table->foreignId('registered_by')->nullable()
+
+                  ->constrained('users')->nullOnDelete();
+
+
+
+            // Paid or Unpaid 
+
+            $table->enum('payment_status', ['paid', 'unpaid'])->default('unpaid')->index();
+
+
+
+            $table->timestamps();
+
+        });
+
+    }
+
+
+
+    public function down(): void
+
+    {
+
+        Schema::dropIfExists('registrations');
+
+    }
+
+}; 
+
+
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Models 
+
+
+
+<?php
+
+
+
+namespace App\Models;
+
+
+
+use Illuminate\Database\Eloquent\Model;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+use Illuminate\Support\Facades\Crypt;
+
+use Illuminate\Support\Facades\Storage;
+
+
+
+class Registration extends Model
+
+{
+
+    use HasFactory;
+
+
+
+    protected $fillable = [
+
+        'first_name', 'last_name', 'email', 'phone', 'address', 'company_name',
+
+        'registration_type', 'server_mode', 'qr_code_path',
+
+        'ticket_number', 'confirmed_at', 'email_hash',
+
+
+
+        // allow controller updates on these fields
+
+        'confirmed', 'confirmed_by', 'registered_by',
+
+        'badge_printed_status_id', 'ticket_printed_status_id', 'payment_status',
+
+    ];
+
+
+
+    // Remove guarded to allow mass-assignment of the fields above
+
+    // protected $guarded = [];
+
+
+
+    protected $casts = [
+
+        'confirmed'    => 'boolean',
+
+        'confirmed_at' => 'datetime',
+
+        'created_at'   => 'datetime',
+
+        'updated_at'   => 'datetime',
+
+    ];
+
+
+
+    // Always append a web-safe QR URL to JSON
+
+    protected $appends = ['qr_url', 'badge_status_display'];
+
+
+
+    public function getBadgeStatusDisplayAttribute(): array
+
+    {
+
+        $statusName = $this->badgeStatus->name ?? 'not_printed';
+
+
+
+        switch ($statusName) {
+
+            case 'printed':
+
+                return ['text' => 'PRINTED', 'color' => '#28a745'];
+
+            case 'reprinted':
+
+                return ['text' => 'RE-PRINTED', 'color' => '#fd7e14'];
+
+            case 'not_printed':
+
+            default:
+
+                return ['text' => 'NOT PRINTED', 'color' => '#6c757d'];
+
+        }
+
+    }
+
+
+
+    // Accessor: returns a full HTTP URL to the QR image or null if not available
+
+    public function getQrUrlAttribute(): ?string
+
+    {
+
+        if (!$this->qr_code_path) {
+
+            return null;
+
+        }
+
+
+
+    // Normalize slashes and build relative path
+
+    $relative = ltrim(str_replace('\\', '/', $this->qr_code_path), '/');
+
+
+
+    // Return proper absolute URL like http://127.0.0.1:8000/storage/qrcodes/TICKET-XYZ.png
+
+    return asset('storage/' . $relative);
+
+    }
+
+
+
+    // Company name encryption
+
+    public function setCompanyNameAttribute($value)
+
+    {
+
+        $this->attributes['company_name'] = $value ? Crypt::encryptString($value) : null;
+
+    }
+
+    public function getCompanyNameAttribute($value)
+
+    {
+
+        return $value ? Crypt::decryptString($value) : null;
+
+    }
+
+
+
+    /* ---------------------------
+
+     |  Encrypt / Decrypt Fields
+
+     |----------------------------*/
+
+    public function setFirstNameAttribute($value)
+
+    {
+
+        $this->attributes['first_name'] = Crypt::encryptString($value);
+
+    }
+
+    public function getFirstNameAttribute($value)
+
+    {
+
+        return $value ? Crypt::decryptString($value) : null;
+
+    }
+
+
+
+    public function setLastNameAttribute($value)
+
+    {
+
+        $this->attributes['last_name'] = Crypt::encryptString($value);
+
+    }
+
+    public function getLastNameAttribute($value)
+
+    {
+
+        return $value ? Crypt::decryptString($value) : null;
+
+    }
+
+
+
+    public function setEmailAttribute($value)
+
+    {
+
+        $this->attributes['email'] = Crypt::encryptString($value);
+
+    }
+
+    public function getEmailAttribute($value)
+
+    {
+
+        return $value ? Crypt::decryptString($value) : null;
+
+    }
+
+
+
+    public function setPhoneAttribute($value)
+
+    {
+
+        $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
+
+    }
+
+    public function getPhoneAttribute($value)
+
+    {
+
+        return $value ? Crypt::decryptString($value) : null;
+
+    }
+
+
+
+    public function setAddressAttribute($value)
+
+    {
+
+        $this->attributes['address'] = $value ? Crypt::encryptString($value) : null;
+
+    }
+
+    public function getAddressAttribute($value)
+
+    {
+
+        return $value ? Crypt::decryptString($value) : null;
+
+    }
+
+
+
+    /* ---------------------------
+
+     |  Relationships
+
+     |----------------------------*/
+
+    public function confirmedBy()
+
+    {
+
+        return $this->belongsTo(User::class, 'confirmed_by');
+
+    }
+
+
+
+    public function registeredBy()
+
+    {
+
+        return $this->belongsTo(User::class, 'registered_by');
+
+    }
+
+
+
+    public function scans()
+
+    {
+
+        return $this->hasMany(Scan::class);
+
+    }
+
+
+
+    public function badgeStatus()
+
+    {
+
+        return $this->belongsTo(PrintStatus::class, 'badge_printed_status_id');
+
+    }
+
+
+
+    public function ticketStatus()
+
+    {
+
+        return $this->belongsTo(PrintStatus::class, 'ticket_printed_status_id');
+
+    }
+
+} 
+
+
+
+C:\xampp\htdocs\Online-Registration-System\backend\app\Http\Controllers\RegistrationController.php 
+
+
+
 <?php
 
 namespace App\Http\Controllers;
@@ -24,55 +552,38 @@ class RegistrationController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->validate(['per_page' => 'integer|min:10|max:150'])['per_page'] ?? 150;
+        $perPage = $request->validate(['per_page' => 'integer|min:10|max:100'])['per_page'] ?? 50;
         $registrations = Registration::with(['badgeStatus', 'ticketStatus'])->latest()->paginate($perPage);
         return response()->json($registrations);
     }
 
     public function store(Request $request): JsonResponse
     {
-        //✅ UPDATED: Added validation for all new fields and updated enums.
+        // 🎨 UPDATED: Removed the incorrect 'unique' validation rules for encrypted name fields.
         $validated = $request->validate([
-                // Personal Info
-                'first_name' => 'required|string|max:255',
-                'last_name' => 'required|string|max:255',
-                'email' => 'nullable|email|max:255',
-                'phone' => 'nullable|string|max:20',
-                'address' => 'nullable|string|max:255',
-                'company_name' => 'required|string|max:255',
-                'designation' => 'nullable|string|max:255',
-        
-                // Demographics
-                'age_range' => ['nullable', Rule::in(['18-24', '25-34', '35-44', '45-54', '55-64', '65+'])],
-                'gender' => ['nullable', Rule::in(['Male', 'Female', 'Prefer not to say', 'Others'])],
-                'gender_other' => 'nullable|string|max:255|required_if:gender,Others',
-        
-                // Survey Questions
-                'industry_sector' => 'nullable|string|max:255',
-                'industry_sector_other' => 'nullable|string|max:255',
-                'reason_for_attending' => 'nullable|string|max:1000',
-                'reason_for_attending_other' => 'nullable|string|max:1000',
-                'specific_areas_of_interest' => 'nullable|string|max:1000',
-                'specific_areas_of_interest_other' => 'nullable|string|max:1000',
-                'how_did_you_learn_about' => 'nullable|string|max:1000',
-                'how_did_you_learn_about_other' => 'nullable|string|max:1000',
-        
-                // System Info
-                'registration_type' => ['required', Rule::in(['onsite', 'online', 'pre-registered', 'complimentary'])],
-                'payment_status' => ['nullable', Rule::in(['unpaid', 'paid', 'complimentary'])],
-            ]);
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255', // The email_hash check below handles uniqueness.
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'company_name' => 'nullable|string|max:255', // 'required' is not needed with 'nullable'.
+            'registration_type' => 'required|in:onsite,online,pre-registered',
+            'payment_status' => 'nullable|in:unpaid,paid',
+        ]);
 
         // ✅ NEW: Manual uniqueness check for the full name combination.
         // This is required because the database cannot enforce uniqueness on encrypted columns.
         // ⚠️ WARNING: On very large datasets (10,000+), this could become slow as it decrypts names in memory.
         $firstName = $validated['first_name'];
-        $existing = Registration::all()->first(function ($registration) use ($firstName) {
+        $lastName = $validated['last_name'];
+        $existing = Registration::all()->first(function ($registration) use ($firstName, $lastName) {
             // Use accessors to compare decrypted values case-insensitively.
-            return strtolower($registration->first_name) === strtolower($firstName);
+            return strtolower($registration->first_name) === strtolower($firstName) &&
+                   strtolower($registration->last_name) === strtolower($lastName);
         });
 
         if ($existing) {
-            return response()->json(['error' => 'A registration with this first name already exists.'], 409); // 409 Conflict
+            return response()->json(['error' => 'A registration with this first and last name already exists.'], 409); // 409 Conflict
         }
     
         // Check for duplicate email hash
@@ -91,7 +602,7 @@ class RegistrationController extends Controller
         }
     
         // ServerMode validation
-        if (!in_array($validated['registration_type'], ['pre-registered', 'complimentary'])) {
+        if ($validated['registration_type'] !== 'pre-registered') {
             $allowedTypes = explode(',', str_replace('both', 'onsite,online', $serverMode->mode));
             if (!in_array($validated['registration_type'], $allowedTypes)) {
                 return response()->json(['error' => 'Registration type not allowed in current mode'], 400);
@@ -107,7 +618,7 @@ class RegistrationController extends Controller
     
         // Create Registration
         $ticketNumber = 'TICKET-' . strtoupper(Str::random(12));
-        $registration = Registration::create(array_merge($validated, [
+        $registration = Registration::create([
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
             'email' => $validated['email'],
@@ -122,7 +633,7 @@ class RegistrationController extends Controller
             'ticket_number' => $ticketNumber,
             'registered_by' => Auth::id(),
             'payment_status' => $validated['payment_status'] ?? 'unpaid',
-        ]));
+        ]);
     
         // Dispatch QR code generation job
         (new GenerateQrCode($registration))->handle();
@@ -160,24 +671,8 @@ class RegistrationController extends Controller
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:255',
             'company_name' => 'nullable|string|max:255',
-            'designation' => 'nullable|string|max:255',
-            // Demographics
-            'age_range' => ['nullable', Rule::in(['18-24', '25-34', '35-44', '45-54', '55-64', '65+'])],
-            'gender' => ['nullable', Rule::in(['Male', 'Female', 'Prefer not to say', 'Others'])],
-            'gender_other' => 'nullable|string|max:255|required_if:gender,Others',
-            // Survey Questions
-            'industry_sector' => 'nullable|string|max:255',
-            'industry_sector_other' => 'nullable|string|max:255',
-            'reason_for_attending' => 'nullable|string|max:1000',
-            'reason_for_attending_other' => 'nullable|string|max:1000',
-            'specific_areas_of_interest' => 'nullable|string|max:1000',
-            'specific_areas_of_interest_other' => 'nullable|string|max:1000',
-            'how_did_you_learn_about' => 'nullable|string|max:1000',
-            'how_did_you_learn_about_other' => 'nullable|string|max:1000',
-            // System Info
-            'registration_type' => ['required', Rule::in(['onsite', 'online', 'pre-registered', 'complimentary'])],
-            'payment_status' => ['nullable', Rule::in(['unpaid', 'paid', 'complimentary'])],
-            ]);
+            'registration_type' => 'required|in:onsite,online,pre-registered',
+        ]);
 
         // ✅ NEW: Manual uniqueness check for the full name combination on update.
         $firstName = $validated['first_name'];
@@ -208,37 +703,28 @@ class RegistrationController extends Controller
     /**
      * Toggles the payment status of a registration.
      */
-    /**
- * Updates the payment status of a registration to a specific value.
- */
-    public function updatePaymentStatus(Request $request, Registration $registration): JsonResponse
+    public function togglePaymentStatus(Registration $registration): JsonResponse
     {
         try {
-            $validated = $request->validate([
-                'payment_status' => ['required', Rule::in(['paid', 'unpaid', 'complimentary'])]
-            ]);
-        
-            $oldStatus = $registration->payment_status;
-            $newStatus = $validated['payment_status'];
-        
+            $newStatus = $registration->payment_status === 'paid' ? 'unpaid' : 'paid';
+
             $registration->update(['payment_status' => $newStatus]);
             
-            Log::info('Payment status updated', [
+            Log::info('Payment status toggled', [
                 'registration_id' => $registration->id,
-                'old_status' => $oldStatus,
                 'new_status' => $newStatus,
                 'user_id' => Auth::id()
             ]);
-        
+
             // Return the entire fresh model so the frontend can update its state
             return response()->json($registration->fresh(['badgeStatus', 'ticketStatus', 'registeredBy:id,name']));
-        
+
         } catch (\Exception $e) {
-            Log::error('Failed to update payment status', [
+            Log::error('Failed to toggle payment status', [
                 'registration_id' => $registration->id,
                 'error' => $e->getMessage()
             ]);
-        
+
             return response()->json(['error' => 'Could not update payment status'], 500);
         }
     }
@@ -556,7 +1042,7 @@ class RegistrationController extends Controller
         
     }
 
-        /**
+            /**
          * Verify pre-registration by ticket number
          * Used to auto-fill form for pre-registered attendees
          */
@@ -595,28 +1081,11 @@ class RegistrationController extends Controller
                 return response()->json([
                     'valid' => true,
                     'already_confirmed' => false,
-                    // Personal Info
                     'first_name' => $registration->first_name,
                     'last_name' => $registration->last_name,
                     'email' => $registration->email,
                     'phone' => $registration->phone,
-                    'address' => $registration->address,
                     'company_name' => $registration->company_name,
-                    'designation' => $registration->designation,
-                    // Demographics
-                    'age_range' => $registration->age_range,
-                    'gender' => $registration->gender,
-                    'gender_other' => $registration->gender_other,
-                    // Survey
-                    'industry_sector' => $registration->industry_sector,
-                    'industry_sector_other' => $registration->industry_sector_other,
-                    'reason_for_attending' => $registration->reason_for_attending,
-                    'reason_for_attending_other' => $registration->reason_for_attending_other,
-                    'specific_areas_of_interest' => $registration->specific_areas_of_interest,
-                    'specific_areas_of_interest_other' => $registration->specific_areas_of_interest_other,
-                    'how_did_you_learn_about' => $registration->how_did_you_learn_about,
-                    'how_did_you_learn_about_other' => $registration->how_did_you_learn_about_other,
-                    // System
                     'payment_status' => $registration->payment_status,
                     'ticket_number' => $registration->ticket_number,
                 ], 200);

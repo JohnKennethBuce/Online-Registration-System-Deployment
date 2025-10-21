@@ -90,6 +90,7 @@ export default function EditRegistrationForm({ registration, onSave, onCancel })
               <option value="onsite">Onsite</option>
               <option value="online">Online</option>
               <option value="pre-registered">Pre-Registered</option>
+              <option value="complimentary">Complimentary</option>
             </Form.Select>
           </Form.Group>
         </Col>
