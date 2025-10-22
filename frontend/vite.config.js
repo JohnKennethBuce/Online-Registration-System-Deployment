@@ -1,33 +1,62 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    visualizer({
+      filename: 'stats.html', // visualize bundle size after build
+      open: false,            // set to true to open automatically after build
+      gzipSize: true,
+      brotliSize: true,
+      base: '/',
+    }),
+  ],
 
-  // Configure base path for deployment (helpful for deployment on subpaths)
+  // Base path for deployment
   base: '/', // Change this if your app is hosted in a subfolder, e.g., '/my-app/'
 
-  // Server configuration (you can add proxy for development)
+  // Dev server config (CORS-safe proxy)
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:8000', // API Proxy during development to avoid CORS
+      '/api': 'http://127.0.0.1:8000',
       '/storage': 'http://127.0.0.1:8000',
     },
   },
 
-  // Build configuration (you can customize this for production builds)
+  // Production build configuration
   build: {
-    outDir: 'dist', // Output directory for build files
-    assetsDir: 'assets', // Directory to store static assets
-    minify: 'esbuild', // Minify output for production
-    sourcemap: true, // Enable source maps for debugging
+    outDir: 'dist',
+    assetsDir: 'assets',
+    minify: 'esbuild',
+    sourcemap: true,
+
+    // 🧩 Increase limit so you don't see warnings unnecessarily
+    chunkSizeWarningLimit: 2000,
+
+    // 🪄 Smart chunk splitting: separates vendor + heavy libs
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) return 'react-vendor'
+            if (id.includes('axios')) return 'axios-vendor'
+            if (id.includes('chart.js')) return 'chart-vendor'
+            if (id.includes('recharts')) return 'recharts-vendor'
+            if (id.includes('@mui') || id.includes('shadcn')) return 'ui-vendor'
+            return 'vendor'
+          }
+        },
+      },
+    },
   },
 
-  // Define environment variables (useful for different environments like dev, prod)
+  // Environment variable injection
   define: {
     'process.env': {
-      NODE_ENV: process.env.NODE_ENV || 'development', // Set NODE_ENV dynamically
+      NODE_ENV: process.env.NODE_ENV || 'development',
     },
   },
 })

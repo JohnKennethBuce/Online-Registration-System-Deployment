@@ -1,0 +1,12 @@
+# Laravel
+/vendor
+/node_modules
+/public/storage
+/storage/*.key
+.env
+.env.*
+/bootstrap/cache/*.php
+
+# React / Vite
+/frontend/node_modules
+/frontend/dist
