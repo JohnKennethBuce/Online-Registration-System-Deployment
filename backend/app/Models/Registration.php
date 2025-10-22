@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Registration extends Model
 {
@@ -17,16 +17,24 @@ class Registration extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        // Existing fields
-        'first_name', 'last_name', 'email', 'phone', 'address', 'company_name',
-        'registration_type', 'server_mode', 'qr_code_path',
-        'ticket_number', 'confirmed_at', 'email_hash',
-
-        // New fields from your updated migration
+        // ✅ Encrypted PII
+        'first_name',
+        'last_name',
+        'email',
+        'email_hash',
+        'phone',
+        'address',
+        'company_name',
+        
+        // ✅ Demographics (NOT encrypted - for analytics)
         'age_range',
         'gender',
         'gender_other',
+        
+        // ✅ Professional Info (NOT encrypted)
         'designation',
+        
+        // ✅ Survey Data (NOT encrypted - for analytics)
         'industry_sector',
         'industry_sector_other',
         'reason_for_attending',
@@ -35,10 +43,19 @@ class Registration extends Model
         'specific_areas_of_interest_other',
         'how_did_you_learn_about',
         'how_did_you_learn_about_other',
-
-        // System-managed fields
-        'confirmed', 'confirmed_by', 'registered_by',
-        'badge_printed_status_id', 'ticket_printed_status_id', 'payment_status',
+        
+        // ✅ System Fields
+        'registration_type',
+        'ticket_number',
+        'qr_code_path',
+        'server_mode',
+        'confirmed',
+        'confirmed_by',
+        'confirmed_at',
+        'registered_by',
+        'badge_printed_status_id',
+        'ticket_printed_status_id',
+        'payment_status',
     ];
 
     /**
@@ -60,6 +77,9 @@ class Registration extends Model
      */
     protected $appends = ['qr_url', 'badge_status_display'];
 
+    /**
+     * Get badge status display attributes
+     */
     public function getBadgeStatusDisplayAttribute(): array
     {
         $statusName = $this->badgeStatus->name ?? 'not_printed';
@@ -75,6 +95,9 @@ class Registration extends Model
         }
     }
 
+    /**
+     * Get QR code URL
+     */
     public function getQrUrlAttribute(): ?string
     {
         if (!$this->qr_code_path) {
@@ -84,87 +107,153 @@ class Registration extends Model
         return asset('storage/' . $relative);
     }
 
-    /* ---------------------------
-     |  Encrypt / Decrypt Fields
-     |----------------------------*/
+    /* ========================================================================
+     | ENCRYPTION - Only for True PII (Personal Identifiable Information)
+     | ======================================================================== */
 
-    // --- Existing encrypted fields ---
-    public function setFirstNameAttribute($value) { $this->attributes['first_name'] = Crypt::encryptString($value); }
-    public function getFirstNameAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    // ✅ First Name - ENCRYPTED
+    public function setFirstNameAttribute($value)
+    {
+        $this->attributes['first_name'] = Crypt::encryptString($value);
+    }
 
-    public function setLastNameAttribute($value) { $this->attributes['last_name'] = Crypt::encryptString($value); }
-    public function getLastNameAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    public function getFirstNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
-    public function setEmailAttribute($value) { $this->attributes['email'] = $value ? Crypt::encryptString($value) : null; }
-    public function getEmailAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    // ✅ Last Name - ENCRYPTED
+    public function setLastNameAttribute($value)
+    {
+        $this->attributes['last_name'] = Crypt::encryptString($value);
+    }
 
-    public function setPhoneAttribute($value) { $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null; }
-    public function getPhoneAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    public function getLastNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
-    public function setAddressAttribute($value) { $this->attributes['address'] = $value ? Crypt::encryptString($value) : null; }
-    public function getAddressAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    // ✅ Email - ENCRYPTED
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = $value ? Crypt::encryptString($value) : null;
+    }
 
-    public function setCompanyNameAttribute($value) { $this->attributes['company_name'] = $value ? Crypt::encryptString($value) : null; }
-    public function getCompanyNameAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    public function getEmailAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
+    // ✅ Phone - ENCRYPTED
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? Crypt::encryptString($value) : null;
+    }
 
-    // --- NEW Encrypted Fields ---
-    public function setGenderOtherAttribute($value) { $this->attributes['gender_other'] = $value ? Crypt::encryptString($value) : null; }
-    public function getGenderOtherAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    public function getPhoneAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
-    public function setDesignationAttribute($value) { $this->attributes['designation'] = $value ? Crypt::encryptString($value) : null; }
-    public function getDesignationAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    // ✅ Address - ENCRYPTED
+    public function setAddressAttribute($value)
+    {
+        $this->attributes['address'] = $value ? Crypt::encryptString($value) : null;
+    }
 
-    public function setIndustrySectorAttribute($value) { $this->attributes['industry_sector'] = $value ? Crypt::encryptString($value) : null; }
-    public function getIndustrySectorAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    public function getAddressAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
-    public function setIndustrySectorOtherAttribute($value) { $this->attributes['industry_sector_other'] = $value ? Crypt::encryptString($value) : null; }
-    public function getIndustrySectorOtherAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    // ✅ Company Name - ENCRYPTED
+    public function setCompanyNameAttribute($value)
+    {
+        $this->attributes['company_name'] = $value ? Crypt::encryptString($value) : null;
+    }
 
-    public function setReasonForAttendingAttribute($value) { $this->attributes['reason_for_attending'] = $value ? Crypt::encryptString($value) : null; }
-    public function getReasonForAttendingAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    public function getCompanyNameAttribute($value)
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
 
-    public function setReasonForAttendingOtherAttribute($value) { $this->attributes['reason_for_attending_other'] = $value ? Crypt::encryptString($value) : null; }
-    public function getReasonForAttendingOtherAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    /* ========================================================================
+     | NO ENCRYPTION - Survey/Demographics (for analytics and groupBy queries)
+     | ========================================================================
+     | The following fields are stored as PLAIN TEXT:
+     | - age_range (enum)
+     | - gender (enum)
+     | - gender_other (string)
+     | - designation (string)
+     | - industry_sector (string)
+     | - industry_sector_other (string)
+     | - reason_for_attending (text)
+     | - reason_for_attending_other (text)
+     | - specific_areas_of_interest (string)
+     | - specific_areas_of_interest_other (text)
+     | - how_did_you_learn_about (string)
+     | - how_did_you_learn_about_other (text)
+     | 
+     | ✅ These fields are NOT sensitive PII and need to be queryable for reports
+     | ======================================================================== */
 
-    public function setSpecificAreasOfInterestAttribute($value) { $this->attributes['specific_areas_of_interest'] = $value ? Crypt::encryptString($value) : null; }
-    public function getSpecificAreasOfInterestAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
+    /* ========================================================================
+     | Relationships
+     | ======================================================================== */
 
-    public function setSpecificAreasOfInterestOtherAttribute($value) { $this->attributes['specific_areas_of_interest_other'] = $value ? Crypt::encryptString($value) : null; }
-    public function getSpecificAreasOfInterestOtherAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
-
-    public function setHowDidYouLearnAboutAttribute($value) { $this->attributes['how_did_you_learn_about'] = $value ? Crypt::encryptString($value) : null; }
-    public function getHowDidYouLearnAboutAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
-
-    public function setHowDidYouLearnAboutOtherAttribute($value) { $this->attributes['how_did_you_learn_about_other'] = $value ? Crypt::encryptString($value) : null; }
-    public function getHowDidYouLearnAboutOtherAttribute($value) { return $value ? Crypt::decryptString($value) : null; }
-
-
-    /* ---------------------------
-     |  Relationships
-     |----------------------------*/
+    /**
+     * User who confirmed this registration
+     */
     public function confirmedBy()
     {
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    /**
+     * User who registered this attendee
+     */
     public function registeredBy()
     {
         return $this->belongsTo(User::class, 'registered_by');
     }
 
+    /**
+     * QR code scans for this registration
+     */
     public function scans()
     {
         return $this->hasMany(Scan::class);
     }
 
+    /**
+     * Badge print status
+     */
     public function badgeStatus()
     {
         return $this->belongsTo(PrintStatus::class, 'badge_printed_status_id');
     }
 
+    /**
+     * Ticket print status
+     */
     public function ticketStatus()
     {
         return $this->belongsTo(PrintStatus::class, 'ticket_printed_status_id');
+    }
+
+    /* ========================================================================
+     | Model Events
+     | ======================================================================== */
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Auto-generate ticket number on creation
+        static::creating(function ($registration) {
+            if (empty($registration->ticket_number)) {
+                $registration->ticket_number = 'TICKET-' . strtoupper(Str::random(12));
+            }
+        });
     }
 }

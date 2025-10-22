@@ -333,18 +333,16 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get counts for reports page (printed, re-printed, paid, unpaid, total).
+     * ✅ UPDATED: Get counts for reports page with new demographic and survey breakdowns
      */
     public function reportsCounts(): JsonResponse
     {
         try {
             $user = Auth::user();
-            /** @var \App\Models\User $user */ // ✅ ADD THIS LINE - It fixes the editor error.
+            /** @var \App\Models\User $user */
 
-            // THE FIX: Check for superadmin role OR 'view-reports' permission.
             $canViewAll = $user->role->name === 'superadmin' || $user->can('view-reports');
             
-            // The query will now correctly include all records for users with the right permission.
             $baseQuery = $canViewAll
                 ? Registration::query() 
                 : Registration::where('registered_by', $user->id);
@@ -354,15 +352,108 @@ class DashboardController extends Controller
             $reprintedStatusId = PrintStatus::where('type', 'badge')->where('name', 'reprinted')->value('id');
 
             return response()->json([
-                'not_printed' => (clone $baseQuery)->where(function ($query) use ($notPrintedStatusId) {
-                $query->where('badge_printed_status_id', $notPrintedStatusId)
-                ->orWhereNull('badge_printed_status_id');
-                 })->count(),
-                'printed'     => (clone $baseQuery)->where('badge_printed_status_id', $printedStatusId)->count(),
-                'reprinted'   => (clone $baseQuery)->where('badge_printed_status_id', $reprintedStatusId)->count(),
-                'paid'        => (clone $baseQuery)->where('payment_status', 'paid')->count(),
-                'unpaid'      => (clone $baseQuery)->where('payment_status', 'unpaid')->count(),
-                'total'       => (clone $baseQuery)->count(),
+                // Badge Status Counts
+                'badge_status' => [
+                    'not_printed' => (clone $baseQuery)->where(function ($query) use ($notPrintedStatusId) {
+                        $query->where('badge_printed_status_id', $notPrintedStatusId)
+                              ->orWhereNull('badge_printed_status_id');
+                    })->count(),
+                    'printed' => (clone $baseQuery)->where('badge_printed_status_id', $printedStatusId)->count(),
+                    'reprinted' => (clone $baseQuery)->where('badge_printed_status_id', $reprintedStatusId)->count(),
+                ],
+
+                // Payment Status Counts
+                'payment_status' => [
+                    'paid' => (clone $baseQuery)->where('payment_status', 'paid')->count(),
+                    'unpaid' => (clone $baseQuery)->where('payment_status', 'unpaid')->count(),
+                    'complimentary' => (clone $baseQuery)->where('payment_status', 'complimentary')->count(),
+                ],
+
+                // Registration Type Counts
+                'registration_type' => [
+                    'onsite' => (clone $baseQuery)->where('registration_type', 'onsite')->count(),
+                    'online' => (clone $baseQuery)->where('registration_type', 'online')->count(),
+                    'pre_registered' => (clone $baseQuery)->where('registration_type', 'pre-registered')->count(),
+                    'complimentary' => (clone $baseQuery)->where('registration_type', 'complimentary')->count(),
+                ],
+
+                // Demographics Counts
+                'demographics' => [
+                    'age_ranges' => (clone $baseQuery)
+                        ->select('age_range', DB::raw('count(*) as count'))
+                        ->whereNotNull('age_range')
+                        ->where('age_range', '!=', '')
+                        ->groupBy('age_range')
+                        ->orderBy('age_range')
+                        ->pluck('count', 'age_range'),
+                    
+                    'gender' => (clone $baseQuery)
+                        ->select('gender', DB::raw('count(*) as count'))
+                        ->whereNotNull('gender')
+                        ->where('gender', '!=', '')
+                        ->groupBy('gender')
+                        ->pluck('count', 'gender'),
+                    
+                    'total_with_demographics' => (clone $baseQuery)
+                        ->where(function ($q) {
+                            $q->whereNotNull('age_range')
+                              ->orWhereNotNull('gender');
+                        })
+                        ->count(),
+                ],
+
+                // Survey Data Counts
+                'survey' => [
+                    'industry_sector' => (clone $baseQuery)
+                        ->select('industry_sector', DB::raw('count(*) as count'))
+                        ->whereNotNull('industry_sector')
+                        ->where('industry_sector', '!=', '')
+                        ->groupBy('industry_sector')
+                        ->orderByDesc('count')
+                        ->limit(10)
+                        ->pluck('count', 'industry_sector'),
+                    
+                    'reason_for_attending' => (clone $baseQuery)
+                        ->select('reason_for_attending', DB::raw('count(*) as count'))
+                        ->whereNotNull('reason_for_attending')
+                        ->where('reason_for_attending', '!=', '')
+                        ->groupBy('reason_for_attending')
+                        ->orderByDesc('count')
+                        ->limit(10)
+                        ->pluck('count', 'reason_for_attending'),
+                    
+                    'areas_of_interest' => (clone $baseQuery)
+                        ->select('specific_areas_of_interest', DB::raw('count(*) as count'))
+                        ->whereNotNull('specific_areas_of_interest')
+                        ->where('specific_areas_of_interest', '!=', '')
+                        ->groupBy('specific_areas_of_interest')
+                        ->orderByDesc('count')
+                        ->limit(10)
+                        ->pluck('count', 'specific_areas_of_interest'),
+                    
+                    'how_did_you_learn' => (clone $baseQuery)
+                        ->select('how_did_you_learn_about', DB::raw('count(*) as count'))
+                        ->whereNotNull('how_did_you_learn_about')
+                        ->where('how_did_you_learn_about', '!=', '')
+                        ->groupBy('how_did_you_learn_about')
+                        ->orderByDesc('count')
+                        ->limit(10)
+                        ->pluck('count', 'how_did_you_learn_about'),
+                    
+                    'total_with_survey' => (clone $baseQuery)
+                        ->where(function ($q) {
+                            $q->whereNotNull('industry_sector')
+                              ->orWhereNotNull('reason_for_attending')
+                              ->orWhereNotNull('specific_areas_of_interest')
+                              ->orWhereNotNull('how_did_you_learn_about');
+                        })
+                        ->count(),
+                ],
+
+                // Overall Totals
+                'total' => (clone $baseQuery)->count(),
+                'confirmed' => (clone $baseQuery)->where('confirmed', true)->count(),
+                'unconfirmed' => (clone $baseQuery)->where('confirmed', false)->count(),
             ]);
         } catch (\Exception $e) {
             Log::error('Reports counts error: ' . $e->getMessage());
@@ -373,16 +464,15 @@ class DashboardController extends Controller
         }
     }
 
-      /**
-     * Reports List with search and export support.
+    /**
+     * ✅ UPDATED: Reports List with enhanced search and export support
      */
     public function reportsList(Request $request): JsonResponse
     {
         try {
             $user = Auth::user();
-            /** @var \App\Models\User $user */ // ✅ ADD THIS LINE - It fixes the editor error.
+            /** @var \App\Models\User $user */
 
-            // THE FIX: Check for superadmin role OR 'view-reports' permission.
             $canViewAll = $user->role->name === 'superadmin' || $user->can('view-reports');
 
             $perPage = $request->input('per_page', 50);
@@ -394,18 +484,64 @@ class DashboardController extends Controller
                 'registeredBy:id,name,email'
             ]);
 
-            // Only filter by the user's ID if they DON'T have permission to view all records.
             if (!$canViewAll) {
                 $query->where('registered_by', $user->id);
             }
 
+            // ✅ Enhanced search to include company_name and designation
             if ($search = $request->input('search')) {
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")
                       ->orWhere('last_name', 'like', "%{$search}%")
                       ->orWhere('email', 'like', "%{$search}%")
-                      ->orWhere('ticket_number', 'like', "%{$search}%");
+                      ->orWhere('company_name', 'like', "%{$search}%")
+                      ->orWhere('designation', 'like', "%{$search}%")
+                      ->orWhere('ticket_number', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%");
                 });
+            }
+
+            // ✅ Filter by registration type
+            if ($type = $request->input('registration_type')) {
+                $query->where('registration_type', $type);
+            }
+
+            // ✅ Filter by payment status
+            if ($payment = $request->input('payment_status')) {
+                $query->where('payment_status', $payment);
+            }
+
+            // ✅ Filter by badge status
+            if ($badgeStatus = $request->input('badge_status')) {
+                $statusId = PrintStatus::where('type', 'badge')
+                    ->where('name', $badgeStatus)
+                    ->value('id');
+                if ($statusId) {
+                    $query->where('badge_printed_status_id', $statusId);
+                }
+            }
+
+            // ✅ Filter by date range
+            if ($startDate = $request->input('start_date')) {
+                $query->whereDate('created_at', '>=', $startDate);
+            }
+            if ($endDate = $request->input('end_date')) {
+                $query->whereDate('created_at', '<=', $endDate);
+            }
+
+            // ✅ Filter by industry sector
+            if ($industry = $request->input('industry_sector')) {
+                $query->where('industry_sector', $industry);
+            }
+
+            // ✅ Filter by age range
+            if ($ageRange = $request->input('age_range')) {
+                $query->where('age_range', $ageRange);
+            }
+
+            // ✅ Filter by gender
+            if ($gender = $request->input('gender')) {
+                $query->where('gender', $gender);
             }
 
             if ($all) {
@@ -419,6 +555,202 @@ class DashboardController extends Controller
             Log::error('Reports list error: ' . $e->getMessage());
             return response()->json([
                 'error' => 'Failed to fetch reports list',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Get detailed demographics breakdown
+     */
+    public function demographicsBreakdown(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            /** @var \App\Models\User $user */
+
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-reports');
+            
+            $baseQuery = $canViewAll
+                ? Registration::query() 
+                : Registration::where('registered_by', $user->id);
+
+            return response()->json([
+                'age_ranges' => (clone $baseQuery)
+                    ->select('age_range', DB::raw('count(*) as count'))
+                    ->whereNotNull('age_range')
+                    ->where('age_range', '!=', '')
+                    ->groupBy('age_range')
+                    ->orderBy('age_range')
+                    ->get(),
+                
+                'gender_distribution' => (clone $baseQuery)
+                    ->select('gender', DB::raw('count(*) as count'))
+                    ->whereNotNull('gender')
+                    ->where('gender', '!=', '')
+                    ->groupBy('gender')
+                    ->orderByDesc('count')
+                    ->get(),
+                
+                'total_registrations' => (clone $baseQuery)->count(),
+                'with_demographics' => (clone $baseQuery)
+                    ->where(function ($q) {
+                        $q->whereNotNull('age_range')
+                          ->orWhereNotNull('gender');
+                    })
+                    ->count(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Demographics breakdown error: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to fetch demographics breakdown',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Get survey data analysis
+     */
+    public function surveyAnalysis(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            /** @var \App\Models\User $user */
+
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-reports');
+            
+            $baseQuery = $canViewAll
+                ? Registration::query() 
+                : Registration::where('registered_by', $user->id);
+
+            return response()->json([
+                'industry_sectors' => (clone $baseQuery)
+                    ->select('industry_sector', DB::raw('count(*) as count'))
+                    ->whereNotNull('industry_sector')
+                    ->where('industry_sector', '!=', '')
+                    ->groupBy('industry_sector')
+                    ->orderByDesc('count')
+                    ->get(),
+                
+                'reasons_for_attending' => (clone $baseQuery)
+                    ->select('reason_for_attending', DB::raw('count(*) as count'))
+                    ->whereNotNull('reason_for_attending')
+                    ->where('reason_for_attending', '!=', '')
+                    ->groupBy('reason_for_attending')
+                    ->orderByDesc('count')
+                    ->get(),
+                
+                'areas_of_interest' => (clone $baseQuery)
+                    ->select('specific_areas_of_interest', DB::raw('count(*) as count'))
+                    ->whereNotNull('specific_areas_of_interest')
+                    ->where('specific_areas_of_interest', '!=', '')
+                    ->groupBy('specific_areas_of_interest')
+                    ->orderByDesc('count')
+                    ->get(),
+                
+                'marketing_channels' => (clone $baseQuery)
+                    ->select('how_did_you_learn_about', DB::raw('count(*) as count'))
+                    ->whereNotNull('how_did_you_learn_about')
+                    ->where('how_did_you_learn_about', '!=', '')
+                    ->groupBy('how_did_you_learn_about')
+                    ->orderByDesc('count')
+                    ->get(),
+                
+                'total_responses' => (clone $baseQuery)
+                    ->where(function ($q) {
+                        $q->whereNotNull('industry_sector')
+                          ->orWhereNotNull('reason_for_attending')
+                          ->orWhereNotNull('specific_areas_of_interest')
+                          ->orWhereNotNull('how_did_you_learn_about');
+                    })
+                    ->count(),
+                
+                'total_registrations' => (clone $baseQuery)->count(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Survey analysis error: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to fetch survey analysis',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Export reports data (CSV format)
+     */
+    public function exportReports(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            /** @var \App\Models\User $user */
+
+            $canViewAll = $user->role->name === 'superadmin' || $user->can('view-reports');
+
+            $query = Registration::with([
+                'badgeStatus:id,name,type',
+                'ticketStatus:id,name,type',
+                'registeredBy:id,name,email'
+            ]);
+
+            if (!$canViewAll) {
+                $query->where('registered_by', $user->id);
+            }
+
+            // Apply same filters as reportsList
+            if ($search = $request->input('search')) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                      ->orWhere('last_name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('company_name', 'like', "%{$search}%")
+                      ->orWhere('ticket_number', 'like', "%{$search}%");
+                });
+            }
+
+            if ($type = $request->input('registration_type')) {
+                $query->where('registration_type', $type);
+            }
+
+            if ($payment = $request->input('payment_status')) {
+                $query->where('payment_status', $payment);
+            }
+
+            $registrations = $query->latest()->get();
+
+            // Format data for export
+            $exportData = $registrations->map(function ($reg) {
+                return [
+                    'ticket_number' => $reg->ticket_number,
+                    'first_name' => $reg->first_name,
+                    'last_name' => $reg->last_name,
+                    'email' => $reg->email ?? 'N/A',
+                    'phone' => $reg->phone ?? 'N/A',
+                    'company' => $reg->company_name ?? 'N/A',
+                    'designation' => $reg->designation ?? 'N/A',
+                    'registration_type' => ucfirst($reg->registration_type),
+                    'payment_status' => ucfirst($reg->payment_status),
+                    'badge_status' => $reg->badgeStatus?->name ?? 'not_printed',
+                    'age_range' => $reg->age_range ?? 'N/A',
+                    'gender' => $reg->gender ?? 'N/A',
+                    'industry_sector' => $reg->industry_sector ?? 'N/A',
+                    'reason_for_attending' => $reg->reason_for_attending ?? 'N/A',
+                    'areas_of_interest' => $reg->specific_areas_of_interest ?? 'N/A',
+                    'how_learned_about' => $reg->how_did_you_learn_about ?? 'N/A',
+                    'registered_at' => $reg->created_at->format('Y-m-d H:i:s'),
+                    'registered_by' => $reg->registeredBy?->name ?? 'System',
+                ];
+            });
+
+            return response()->json([
+                'data' => $exportData,
+                'total' => $exportData->count(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Export reports error: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to export reports',
                 'message' => $e->getMessage()
             ], 500);
         }

@@ -34,7 +34,7 @@ Route::post('/registrations', [RegistrationController::class, 'store'])
     ->name('registrations.store')
     ->middleware('throttle:10,1');
 
-// 🎟️ Pre-registration verification (NEW - ADD THIS)
+// 🎟️ Pre-registration verification
 Route::get('/verify-registration/{code}', [RegistrationController::class, 'verifyPreRegistration'])
     ->name('registrations.verify')
     ->middleware('throttle:20,1');
@@ -53,11 +53,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     */
     Route::prefix('auth')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-
-        // ✅ Used by React AuthContext → fetchUser()
         Route::get('/me', fn (Request $request) => $request->user()->load('role'));
-
-        // Optional - debug only
         Route::get('/check', function (Request $request) {
             $user = $request->user()->load('role');
             return response()->json([
@@ -109,7 +105,6 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('server-mode')->group(function () {
-        // GET is public above; keep only mutating/history protected
         Route::post('/', [ServerModeController::class, 'setMode'])
             ->middleware('can:edit-server-mode');
         Route::get('/history', [ServerModeController::class, 'getHistory'])
@@ -130,8 +125,20 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/stats', [DashboardController::class, 'stats']);
         Route::post('/upload-logo', [DashboardController::class, 'uploadLogo']);
         Route::get('/logos', [DashboardController::class, 'getLogos']);
-        Route::get('/reports-counts', [DashboardController::class,'reportsCounts'])->middleware('can:view-reports');
-        Route::get('/reports-list', [DashboardController::class,'reportsList'])->middleware('can:view-reports');
+        
+        // ✅ Reports Routes
+        Route::get('/reports-counts', [DashboardController::class, 'reportsCounts'])
+            ->middleware('can:view-reports');
+        Route::get('/reports-list', [DashboardController::class, 'reportsList'])
+            ->middleware('can:view-reports');
+        
+        // ✅ NEW: Additional Reports Endpoints
+        Route::get('/demographics-breakdown', [DashboardController::class, 'demographicsBreakdown'])
+            ->middleware('can:view-reports');
+        Route::get('/survey-analysis', [DashboardController::class, 'surveyAnalysis'])
+            ->middleware('can:view-reports');
+        Route::get('/export-reports', [DashboardController::class, 'exportReports'])
+            ->middleware('can:view-reports');
     });
 
     /*
@@ -149,8 +156,11 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
             ->middleware('can:edit-registration');
         Route::delete('/{registration}', [RegistrationController::class, 'destroy'])
             ->middleware('can:delete-registration');
-
         Route::put('/{registration}/payment-status', [RegistrationController::class, 'updatePaymentStatus'])
-        ->middleware('can:edit-registration');
+            ->middleware('can:edit-registration');
+        
+        // ✅ NEW: Batch import route
+        Route::post('/batch', [RegistrationController::class, 'batchStore'])
+            ->middleware('can:edit-registration');
     });
 });

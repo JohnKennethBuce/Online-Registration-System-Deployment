@@ -10,73 +10,80 @@ return new class extends Migration {
         Schema::create('registrations', function (Blueprint $table) {
             $table->id();
 
-            // Encrypted personal info
-            $table->text('first_name');
-            $table->text('last_name');
-            $table->text('email')->nullable();
+            // ✅ Encrypted PII (Personal Identifiable Information)
+            $table->text('first_name');                    // Encrypted
+            $table->text('last_name');                     // Encrypted
+            $table->text('email')->nullable();             // Encrypted
             $table->string('email_hash', 64)->unique()->nullable();
-            $table->text('phone')->nullable();
-            $table->text('address')->nullable();
-            $table->text('company_name');
+            $table->text('phone')->nullable();             // Encrypted
+            $table->text('address')->nullable();           // Encrypted
+            $table->text('company_name');                  // Encrypted
+
+            // ✅ Demographics - NOT encrypted (for analytics)
             $table->enum('age_range', [
-                    '18-24',
-                    '25-34',
-                    '35-44',
-                    '45-54',
-                    '55-64',
-                    '65+'
-                ])->nullable();
+                '18-24',
+                '25-34',
+                '35-44',
+                '45-54',
+                '55-64',
+                '65+'
+            ])->nullable()->index();  // Added index for faster queries
 
             $table->enum('gender', [
-                    'Male',
-                    'Female',
-                    'Prefer not to say',
-                    'Others'
-                ])->nullable();
-            $table->text('gender_other')->nullable(); // Encrypted, 
+                'Male',
+                'Female',
+                'Prefer not to say',
+                'Others'
+            ])->nullable()->index();  // Added index for faster queries
 
-            $table->text('designation')->nullable(); // Encrypted,
+            $table->string('gender_other', 100)->nullable();  // Plain text for analytics
 
-            $table->text('industry_sector')->nullable(); // Encrypted
-            $table->text('industry_sector_other')->nullable(); // Encrypted, for "Others" option
+            // ✅ Professional Info - NOT encrypted
+            $table->string('designation', 255)->nullable();  // Plain text
 
-            $table->text('reason_for_attending')->nullable(); // Encrypted
-            $table->text('reason_for_attending_other')->nullable(); // Encrypted, for "Others" option
+            // ✅ Survey Data - NOT encrypted (for analytics and groupBy)
+            $table->string('industry_sector', 255)->nullable()->index();  // Plain text, indexed
+            $table->string('industry_sector_other', 255)->nullable();     // Plain text
 
-            $table->text('specific_areas_of_interest')->nullable(); // Encrypted
-            $table->text('specific_areas_of_interest_other')->nullable(); // Encrypted, for "Others" option
+            $table->text('reason_for_attending')->nullable();             // Plain text (can be long)
+            $table->text('reason_for_attending_other')->nullable();       // Plain text
 
-            $table->text('how_did_you_learn_about')->nullable(); // Encrypted
-            $table->text('how_did_you_learn_about_other')->nullable();
+            $table->string('specific_areas_of_interest', 255)->nullable()->index();  // Plain text, indexed
+            $table->text('specific_areas_of_interest_other')->nullable();            // Plain text
 
+            $table->string('how_did_you_learn_about', 255)->nullable()->index();  // Plain text, indexed
+            $table->text('how_did_you_learn_about_other')->nullable();            // Plain text
+
+            // ✅ System Fields
             $table->enum('registration_type', ['onsite','online','pre-registered', 'complimentary'])->index();
-
-            // Ticket / QR
             $table->string('ticket_number', 100)->unique()->nullable();
             $table->string('qr_code_path', 255)->nullable();
-
             $table->enum('server_mode', ['onsite','online','both'])->default('onsite')->index();
 
-            // Print statuses
+            // ✅ Print Statuses
             $table->foreignId('badge_printed_status_id')->nullable()
                   ->constrained('print_statuses')->nullOnDelete();
             $table->foreignId('ticket_printed_status_id')->nullable()
                   ->constrained('print_statuses')->nullOnDelete();
 
-            // Confirmation
-            $table->boolean('confirmed')->default(false);
+            // ✅ Confirmation
+            $table->boolean('confirmed')->default(false)->index();
             $table->foreignId('confirmed_by')->nullable()
                   ->constrained('users')->nullOnDelete();
             $table->timestamp('confirmed_at')->nullable();
 
-            // Who registered
+            // ✅ Registration Tracking
             $table->foreignId('registered_by')->nullable()
                   ->constrained('users')->nullOnDelete();
 
-            // Paid or Unpaid 
-            $table->enum('payment_status', ['paid', 'unpaid', "complimentary"])->default('unpaid')->index();
+            // ✅ Payment Status
+            $table->enum('payment_status', ['paid', 'unpaid', 'complimentary'])->default('unpaid')->index();
 
             $table->timestamps();
+
+            // ✅ Composite indexes for common queries
+            $table->index(['registration_type', 'payment_status']);
+            $table->index(['created_at', 'registration_type']);
         });
     }
 
